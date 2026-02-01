@@ -583,16 +583,6 @@ function App() {
 
           {/* Right side - Actions */}
           {isViewingOwnProfile && (
-<<<<<<< Updated upstream
-            <Stack direction="row" spacing={1}>
-              <Button
-                variant={editMode ? 'contained' : 'outlined'}
-                size="small"
-                onClick={() => setEditMode(!editMode)}
-              >
-                {editMode ? 'Exit' : 'Edit'}
-              </Button>
-=======
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               {user ? (
                 <Button
@@ -612,7 +602,6 @@ function App() {
                   Sign in to Edit
                 </Button>
               )}
->>>>>>> Stashed changes
               <Button
                 variant={view === 'logs' ? 'contained' : 'outlined'}
                 size="small"
