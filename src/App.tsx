@@ -449,6 +449,11 @@ function App() {
 
   const [editMode, setEditMode] = useState(false)
   const [view, setView] = useState<'portfolio' | 'logs'>('portfolio')
+
+  // Reset edit mode when user signs out
+  useEffect(() => {
+    if (!user) setEditMode(false)
+  }, [user])
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -585,13 +590,24 @@ function App() {
           {/* Right side - Actions */}
           {isViewingOwnProfile && (
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              <Button
-                variant={editMode ? 'contained' : 'outlined'}
-                size="small"
-                onClick={() => setEditMode(!editMode)}
-              >
-                {editMode ? 'Exit' : 'Edit'}
-              </Button>
+              {user ? (
+                <Button
+                  variant={editMode ? 'contained' : 'outlined'}
+                  size="small"
+                  onClick={() => setEditMode(!editMode)}
+                >
+                  {editMode ? 'Exit' : 'Edit'}
+                </Button>
+              ) : (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<GoogleIcon />}
+                  onClick={signInWithGoogle}
+                >
+                  Sign in to Edit
+                </Button>
+              )}
               <Button
                 variant={view === 'logs' ? 'contained' : 'outlined'}
                 size="small"
