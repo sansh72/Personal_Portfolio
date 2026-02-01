@@ -556,7 +556,13 @@ function App() {
       <CssBaseline />
       <Container maxWidth="md" sx={{ py: 8 }}>
         {/* Top bar */}
-        <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          justifyContent="space-between"
+          alignItems={{ xs: 'stretch', sm: 'center' }}
+          sx={{ mb: 4 }}
+        >
           {/* Left side - User info */}
           <Box>
             {user ? (
