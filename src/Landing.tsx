@@ -1,10 +1,8 @@
-import { useState } from "react"
 import { Box, Stack, Typography, ThemeProvider, createTheme, CssBaseline, useMediaQuery } from "@mui/material"
 import { Link } from "react-router-dom"
 
 const Template = () => {
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
-  const [templateSelect, setTemplateSelect] = useState('SoftwareDevelopment')
 
   const theme = createTheme({
     palette: {

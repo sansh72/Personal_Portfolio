@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '../firebase'
 import { sdeTemplate } from '../templates/softwareDev'
-import { bdaTemplate } from '../templates/BDA'
+import { bdaTemplate } from '../templates/bda'
 
 export interface PortfolioData {
   name: string
