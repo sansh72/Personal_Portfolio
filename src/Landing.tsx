@@ -71,7 +71,7 @@ const Template = () => {
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: 500 }}>
-              Business Development Analyst
+              Business Development Associate
             </Typography>
           </Box>
         </Link>
