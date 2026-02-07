@@ -52,12 +52,15 @@ const defaultLogs: LogEntry[] = [
 
 // Hook for current user's data (editable)
 export function useUserData(userId: string | null, templateId?: string) {
+  // Determine which collection to use based on template
+  const collectionName = templateId === 'bda' ? 'bda' : 'sde'
 
   const getDefaultPortfolio = () => {
-  if (templateId === 'bda') return bdaTemplate as PortfolioData
-  if (templateId === 'sde') return sdeTemplate as PortfolioData
-  return defaultPortfolio
-}
+    if (templateId === 'bda') return bdaTemplate as PortfolioData
+    if (templateId === 'sde') return sdeTemplate as PortfolioData
+    return defaultPortfolio
+  }
+
   const [portfolio, setPortfolio] = useState<PortfolioData>(getDefaultPortfolio)
   const [logs, setLogs] = useState<LogEntry[]>(defaultLogs)
   const [isPublished, setIsPublished] = useState(false)
@@ -65,39 +68,50 @@ export function useUserData(userId: string | null, templateId?: string) {
 
   useEffect(() => {
     if (!userId) {
-      // Load from localStorage for non-authenticated users
-      const savedPortfolio = localStorage.getItem('portfolioData')
-      const savedLogs = localStorage.getItem('logsData')
-      if (savedPortfolio) setPortfolio(JSON.parse(savedPortfolio))
+      // Load from localStorage for non-authenticated users (with template key)
+      const storageKey = `portfolioData_${collectionName}`
+      const logsKey = `logsData_${collectionName}`
+      const savedPortfolio = localStorage.getItem(storageKey)
+      const savedLogs = localStorage.getItem(logsKey)
+      if (savedPortfolio) {
+        setPortfolio(JSON.parse(savedPortfolio))
+      } else {
+        setPortfolio(getDefaultPortfolio())
+      }
       if (savedLogs) setLogs(JSON.parse(savedLogs))
       setLoading(false)
       return
     }
 
-    // Load from Firestore
+    // Load from Firestore using template-specific collection
     const loadData = async () => {
-      const userDataDoc = await getDoc(doc(db, 'portfolios', userId))
+      const userDataDoc = await getDoc(doc(db, collectionName, userId))
       if (userDataDoc.exists()) {
         const data = userDataDoc.data() as UserData
         setPortfolio(data.portfolio)
         setLogs(data.logs || defaultLogs)
         setIsPublished(data.isPublished || false)
+      } else {
+        // No saved data, use template defaults
+        setPortfolio(getDefaultPortfolio())
       }
       setLoading(false)
     }
     loadData()
-  }, [userId])
+  }, [userId, collectionName])
 
   const saveData = async (newPortfolio: PortfolioData, newLogs: LogEntry[], published?: boolean) => {
     if (!userId) {
-      // Save to localStorage for non-authenticated users
-      localStorage.setItem('portfolioData', JSON.stringify(newPortfolio))
-      localStorage.setItem('logsData', JSON.stringify(newLogs))
+      // Save to localStorage with template key
+      const storageKey = `portfolioData_${collectionName}`
+      const logsKey = `logsData_${collectionName}`
+      localStorage.setItem(storageKey, JSON.stringify(newPortfolio))
+      localStorage.setItem(logsKey, JSON.stringify(newLogs))
       return
     }
 
-    // Save to Firestore
-    await setDoc(doc(db, 'portfolios', userId), {
+    // Save to Firestore using template-specific collection
+    await setDoc(doc(db, collectionName, userId), {
       portfolio: newPortfolio,
       logs: newLogs,
       isPublished: published ?? isPublished,
@@ -154,19 +168,24 @@ export function usePublicProfile(username: string | null) {
 
       const userId = usersSnapshot.docs[0].id
 
-      // Get their portfolio
-      const portfolioDoc = await getDoc(doc(db, 'portfolios', userId))
-      if (portfolioDoc.exists()) {
-        const data = portfolioDoc.data() as UserData
-        if (data.isPublished) {
-          setPortfolio(data.portfolio)
-          setLogs(data.logs || [])
-        } else {
-          setNotFound(true)
+      // Check both sde and bda collections for published portfolio
+      const collections = ['sde', 'bda']
+
+      for (const collName of collections) {
+        const portfolioDoc = await getDoc(doc(db, collName, userId))
+        if (portfolioDoc.exists()) {
+          const data = portfolioDoc.data() as UserData
+          if (data.isPublished) {
+            setPortfolio(data.portfolio)
+            setLogs(data.logs || [])
+            setLoading(false)
+            return
+          }
         }
-      } else {
-        setNotFound(true)
       }
+
+      // No published portfolio found
+      setNotFound(true)
       setLoading(false)
     }
 
