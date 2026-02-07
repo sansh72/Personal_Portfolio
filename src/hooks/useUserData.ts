@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '../firebase'
+import { sdeTemplate } from '../templates/softwareDev'
+import { bdaTemplate } from '../templates/BDA'
 
 export interface PortfolioData {
   name: string
@@ -49,8 +51,14 @@ const defaultLogs: LogEntry[] = [
 ]
 
 // Hook for current user's data (editable)
-export function useUserData(userId: string | null) {
-  const [portfolio, setPortfolio] = useState<PortfolioData>(defaultPortfolio)
+export function useUserData(userId: string | null, templateId?: string) {
+
+  const getDefaultPortfolio = () => {
+  if (templateId === 'bda') return bdaTemplate as PortfolioData
+  if (templateId === 'sde') return sdeTemplate as PortfolioData
+  return defaultPortfolio
+}
+  const [portfolio, setPortfolio] = useState<PortfolioData>(getDefaultPortfolio)
   const [logs, setLogs] = useState<LogEntry[]>(defaultLogs)
   const [isPublished, setIsPublished] = useState(false)
   const [loading, setLoading] = useState(true)
