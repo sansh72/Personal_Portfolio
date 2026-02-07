@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Home } from '@mui/icons-material'
 import './App.css'
 import {
   Box,
@@ -439,12 +441,14 @@ function App() {
   const navigate = useNavigate()
   const { user, username, loading: authLoading, signInWithGoogle, logout } = useAuth()
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
-
+  const location = useLocation()
+  const template = (location.state as {template?:string})?.template
   const isViewingOwnProfile = !profileUsername || profileUsername === username
   const isViewingPublicProfile = profileUsername && profileUsername !== username
 
   const { portfolio, logs, isPublished, loading: dataLoading, updatePortfolio, updateLogs, publish, unpublish } = useUserData(
-    isViewingOwnProfile ? (user?.uid || null) : null
+    isViewingOwnProfile ? (user?.uid || null) : null,
+    template
   )
 
   const [editMode, setEditMode] = useState(false)
@@ -554,11 +558,16 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Container maxWidth="md" sx={{ py: 8 }}>
+
+      <Container maxWidth="md" sx={{ py: 6 }}>
         {/* Top bar */}
         <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
           {/* Left side - User info */}
           <Box>
+          <Stack direction='row'>
+            <IconButton component={Link} to='/' size="small" sx={{ mr: 1 }}>
+              <Home />
+            </IconButton>
             {user ? (
               <Stack direction="row" spacing={1} alignItems="center">
                 <Avatar src={user.photoURL || undefined} sx={{ width: 32, height: 32 }} />
@@ -578,7 +587,9 @@ function App() {
               >
                 Sign in
               </Button>
+            
             )}
+          </Stack>
           </Box>
 
           {/* Right side - Actions */}
