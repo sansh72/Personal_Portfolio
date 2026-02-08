@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { Home } from '@mui/icons-material'
 import './App.css'
 import {
@@ -378,7 +378,9 @@ function Portfolio({ editMode, data, updateField, updateExperience, updateProjec
 
 // Public profile view (read-only)
 function PublicProfile({ username }: { username: string }) {
-  const { portfolio, logs, loading, notFound } = usePublicProfile(username)
+  const searchParams = new URLSearchParams(window.location.search)
+  const templateId = searchParams.get('template') || undefined
+  const { portfolio, logs, loading, notFound } = usePublicProfile(username, templateId)
   const [view, setView] = useState<'portfolio' | 'logs'>('portfolio')
 
   if (loading) {
@@ -441,11 +443,10 @@ function App() {
   const navigate = useNavigate()
   const { user, username, loading: authLoading, signInWithGoogle, logout } = useAuth()
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
-  const location = useLocation()
-  const template = (location.state as {template?:string})?.template
+  const searchParams = new URLSearchParams(window.location.search)
+  const template = searchParams.get('template') || 'sde'
   const isViewingOwnProfile = !profileUsername || profileUsername === username
   const isViewingPublicProfile = profileUsername && profileUsername !== username
-
   const { portfolio, logs, isPublished, loading: dataLoading, updatePortfolio, updateLogs, publish, unpublish } = useUserData(
     isViewingOwnProfile ? (user?.uid || null) : null,
     template
@@ -526,10 +527,10 @@ function App() {
     }
     try {
       await publish()
-      const url = `${window.location.origin}/${username}`
+      const url = `${window.location.origin}/${username}?template=${template}`
       await navigator.clipboard.writeText(url)
       setSnackbar({ open: true, message: `Published! Link copied: ${url}`, severity: 'success' })
-      navigate(`/${username}`)
+      navigate(`/${username}?template=${template}`)
     } catch {
       setSnackbar({ open: true, message: 'Failed to publish', severity: 'error' })
     }

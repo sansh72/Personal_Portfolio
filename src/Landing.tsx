@@ -34,7 +34,7 @@ const Template = () => {
                 justifyContent: 'center',
                 alignItems: 'center'
             }}>
-        <Link to="/resume" style={{ textDecoration: 'none', color: 'inherit' }} state={{template: 'sde'}}>
+        <Link to="/resume?template=sde" style={{ textDecoration: 'none', color: 'inherit' }}>
           <Box
             sx={{
               border: '1px solid',
@@ -55,7 +55,7 @@ const Template = () => {
           </Box>
         </Link>
 
-        <Link to="/resume" style={{ textDecoration: 'none', color: 'inherit' }} state={{template: 'bda'}}>
+        <Link to="/resume?template=bda" style={{ textDecoration: 'none', color: 'inherit' }}>
           <Box
             sx={{
               border: '1px solid',

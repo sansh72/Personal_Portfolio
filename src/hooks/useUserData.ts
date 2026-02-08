@@ -143,7 +143,7 @@ export function useUserData(userId: string | null, templateId?: string) {
 }
 
 // Hook for viewing another user's public data (read-only)
-export function usePublicProfile(username: string | null) {
+export function usePublicProfile(username: string | null, templateId?:string) {
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -171,16 +171,15 @@ export function usePublicProfile(username: string | null) {
       // Check both sde and bda collections for published portfolio
       const collections = ['sde', 'bda']
 
-      for (const collName of collections) {
-        const portfolioDoc = await getDoc(doc(db, collName, userId))
-        if (portfolioDoc.exists()) {
-          const data = portfolioDoc.data() as UserData
-          if (data.isPublished) {
-            setPortfolio(data.portfolio)
-            setLogs(data.logs || [])
-            setLoading(false)
-            return
-          }
+      const collectionName = templateId === 'bda' ? 'bda' : 'sde'
+      const portfolioDoc = await getDoc(doc(db, collectionName, userId))
+      if (portfolioDoc.exists()) {
+        const data = portfolioDoc.data() as UserData
+        if (data.isPublished) {
+          setPortfolio(data.portfolio)
+          setLogs(data.logs || [])
+          setLoading(false)
+          return
         }
       }
 
@@ -190,7 +189,7 @@ export function usePublicProfile(username: string | null) {
     }
 
     loadProfile()
-  }, [username])
+  }, [username, templateId])
 
   return { portfolio, logs, loading, notFound }
 }
