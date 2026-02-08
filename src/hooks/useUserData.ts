@@ -168,9 +168,6 @@ export function usePublicProfile(username: string | null, templateId?:string) {
 
       const userId = usersSnapshot.docs[0].id
 
-      // Check both sde and bda collections for published portfolio
-      const collections = ['sde', 'bda']
-
       const collectionName = templateId === 'bda' ? 'bda' : 'sde'
       const portfolioDoc = await getDoc(doc(db, collectionName, userId))
       if (portfolioDoc.exists()) {
