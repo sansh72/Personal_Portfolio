@@ -23,18 +23,20 @@ const Template = () => {
           alignItems: 'center',
           mt:-1
         }}>
-        <Box>
-            <Typography 
-            sx={{fontSize:50, fontFamily:'ui-sans-serif', fontWeight:500}}>
+        <Box sx={{ px: 2, textAlign: 'center' }}>
+            <Typography
+            sx={{fontSize: { xs: 28, sm: 40, md: 50 }, fontFamily:'ui-sans-serif', fontWeight:500}}>
                 Choose <span style={{fontStyle:'italic', color:'#8f8f8f'}}>What </span>Describes You
             </Typography>
         </Box>
-        <Stack direction="row" gap={4}
+        <Stack direction={{ xs: 'column', sm: 'row' }} gap={3}
             sx={{
                 justifyContent: 'center',
-                alignItems: 'center'
+                alignItems: 'center',
+                px: 2,
+                width: '100%'
             }}>
-        <Link to="/resume?template=sde" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Link to="/resume?template=sde" style={{ textDecoration: 'none', color: 'inherit', width: '100%', maxWidth: 300 }}>
           <Box
             sx={{
               border: '1px solid',
@@ -42,6 +44,7 @@ const Template = () => {
               borderRadius: 2,
               p: 4,
               cursor: 'pointer',
+              textAlign: 'center',
               transition: 'transform 0.2s, border-color 0.2s',
               '&:hover': {
                 transform: 'scale(1.05)',
@@ -55,7 +58,7 @@ const Template = () => {
           </Box>
         </Link>
 
-        <Link to="/resume?template=bda" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Link to="/resume?template=bda" style={{ textDecoration: 'none', color: 'inherit', width: '100%', maxWidth: 300 }}>
           <Box
             sx={{
               border: '1px solid',
@@ -63,6 +66,7 @@ const Template = () => {
               borderRadius: 2,
               p: 4,
               cursor: 'pointer',
+              textAlign: 'center',
               transition: 'transform 0.2s, border-color 0.2s',
               '&:hover': {
                 transform: 'scale(1.05)',
