@@ -406,7 +406,7 @@ function PublicProfile({ username }: { username: string }) {
 
   return (
     <>
-      <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mb: 4 }}>
+      <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mb: 4, mt:-8}}>
         <Button
           variant={view === 'logs' ? 'contained' : 'outlined'}
           size="small"
