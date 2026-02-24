@@ -29,7 +29,7 @@ import PublishIcon from '@mui/icons-material/Publish'
 import GoogleIcon from '@mui/icons-material/Google'
 import { useAuth } from './contexts/AuthContext'
 import { useUserData, usePublicProfile } from './hooks/useUserData'
-import type { PortfolioData, LogEntry } from './hooks/useUserData'
+import type { PortfolioData, LogEntry, CustomSection } from './hooks/useUserData'
 
 function EditableText({
   value,
@@ -211,7 +211,7 @@ function Logs({ editMode, logs, onUpdate }: {
   )
 }
 
-function Portfolio({ editMode, data, updateField, updateExperience, updateProject, updateSkill, addExperience, addProject, addSkill, removeExperience, removeProject, removeSkill }: {
+function Portfolio({ editMode, data, updateField, updateExperience, updateProject, updateSkill, addExperience, addProject, addSkill, removeExperience, removeProject, removeSkill, updateEducation, addEducation, removeEducation, updateCustomSection, addCustomSection, removeCustomSection, addCustomSectionItem, removeCustomSectionItem, updateCustomSectionItem, addCustomLink, removeCustomLink, updateCustomLink }: {
   editMode: boolean
   data: PortfolioData
   updateField: <K extends keyof PortfolioData>(field: K, value: PortfolioData[K]) => void
@@ -224,6 +224,18 @@ function Portfolio({ editMode, data, updateField, updateExperience, updateProjec
   removeExperience: (index: number) => void
   removeProject: (index: number) => void
   removeSkill: (index: number) => void
+  updateEducation: (index: number, field: string, value: string) => void
+  addEducation: () => void
+  removeEducation: (index: number) => void
+  updateCustomSection: (sectionId: string, title: string) => void
+  addCustomSection: () => void
+  removeCustomSection: (sectionId: string) => void
+  addCustomSectionItem: (sectionId: string) => void
+  removeCustomSectionItem: (sectionId: string, itemIndex: number) => void
+  updateCustomSectionItem: (sectionId: string, itemIndex: number, field: 'name' | 'description', value: string) => void
+  addCustomLink: () => void
+  removeCustomLink: (index: number) => void
+  updateCustomLink: (index: number, field: 'label' | 'url', value: string) => void
 }) {
   return (
     <>
@@ -295,36 +307,76 @@ function Portfolio({ editMode, data, updateField, updateExperience, updateProjec
         </Stack>
       </Box>
 
-      {/* Projects */}
-      <Box component="section" sx={{ mb: 6 }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-          <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: '0.1em' }}>
-            Projects
-          </Typography>
-          {editMode && (
-            <IconButton size="small" onClick={addProject}>
-              <AddIcon fontSize="small" />
-            </IconButton>
-          )}
-        </Stack>
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 3 }}>
-          {data.projects.map((project, i) => (
-            <Paper key={i} variant="outlined" sx={{ p: 3, position: 'relative' }}>
-              {editMode && (
-                <IconButton
-                  size="small"
-                  onClick={() => removeProject(i)}
-                  sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'error.main', color: 'white', '&:hover': { bgcolor: 'error.dark' } }}
-                >
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              )}
-              <EditableText value={project.name} onChange={(v) => updateProject(i, 'name', v)} editMode={editMode} variant="h6" sx={{ fontWeight: 600, mb: 1 }} />
-              <EditableText value={project.description} onChange={(v) => updateProject(i, 'description', v)} editMode={editMode} sx={{ color: 'text.secondary', fontSize: '0.95rem' }} />
-            </Paper>
-          ))}
+      {/* Education - only shown if data has education */}
+      {data.education && data.education.length > 0 && (
+        <Box component="section" sx={{ mb: 6 }}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+            <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: '0.1em' }}>
+              Education
+            </Typography>
+            {editMode && (
+              <IconButton size="small" onClick={addEducation}>
+                <AddIcon fontSize="small" />
+              </IconButton>
+            )}
+          </Stack>
+          <Stack spacing={4}>
+            {data.education.map((edu, i) => (
+              <Box key={i} sx={{ position: 'relative' }}>
+                {editMode && (
+                  <IconButton
+                    size="small"
+                    onClick={() => removeEducation(i)}
+                    sx={{ position: 'absolute', top: 0, right: 0, bgcolor: 'error.main', color: 'white', '&:hover': { bgcolor: 'error.dark' } }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                )}
+                <Stack direction="row" spacing={0.5} alignItems="baseline" flexWrap="wrap">
+                  <EditableText value={edu.degree} onChange={(v) => updateEducation(i, 'degree', v)} editMode={editMode} sx={{ fontWeight: 600 }} />
+                  <Typography sx={{ color: 'text.disabled' }}>@</Typography>
+                  <EditableText value={edu.institution} onChange={(v) => updateEducation(i, 'institution', v)} editMode={editMode} sx={{ color: 'text.secondary' }} />
+                </Stack>
+                <EditableText value={edu.period} onChange={(v) => updateEducation(i, 'period', v)} editMode={editMode} variant="body2" sx={{ color: 'text.disabled', mb: 1 }} />
+                <EditableText value={edu.description} onChange={(v) => updateEducation(i, 'description', v)} editMode={editMode} sx={{ color: 'text.secondary', lineHeight: 1.6 }} />
+              </Box>
+            ))}
+          </Stack>
         </Box>
-      </Box>
+      )}
+
+      {/* Projects */}
+      {(data.projects.length > 0 || editMode) && (
+        <Box component="section" sx={{ mb: 6 }}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+            <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: '0.1em' }}>
+              Projects
+            </Typography>
+            {editMode && (
+              <IconButton size="small" onClick={addProject}>
+                <AddIcon fontSize="small" />
+              </IconButton>
+            )}
+          </Stack>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 3 }}>
+            {data.projects.map((project, i) => (
+              <Paper key={i} variant="outlined" sx={{ p: 3, position: 'relative' }}>
+                {editMode && (
+                  <IconButton
+                    size="small"
+                    onClick={() => removeProject(i)}
+                    sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'error.main', color: 'white', '&:hover': { bgcolor: 'error.dark' } }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                )}
+                <EditableText value={project.name} onChange={(v) => updateProject(i, 'name', v)} editMode={editMode} variant="h6" sx={{ fontWeight: 600, mb: 1 }} />
+                <EditableText value={project.description} onChange={(v) => updateProject(i, 'description', v)} editMode={editMode} sx={{ color: 'text.secondary', fontSize: '0.95rem' }} />
+              </Paper>
+            ))}
+          </Box>
+        </Box>
+      )}
 
       {/* Skills */}
       <Box component="section" sx={{ mb: 6 }}>
@@ -352,11 +404,69 @@ function Portfolio({ editMode, data, updateField, updateExperience, updateProjec
         </Stack>
       </Box>
 
+      {/* Custom Sections */}
+      {data.customSections?.map((section) => (
+        <Box key={section.id} component="section" sx={{ mb: 6 }}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+            <EditableText
+              value={section.title}
+              onChange={(v) => updateCustomSection(section.id, v)}
+              editMode={editMode}
+              variant="body2"
+              sx={{ color: 'text.secondary', letterSpacing: '0.1em', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 500 }}
+            />
+            {editMode && (
+              <>
+                <IconButton size="small" onClick={() => addCustomSectionItem(section.id)}>
+                  <AddIcon fontSize="small" />
+                </IconButton>
+                <IconButton size="small" onClick={() => removeCustomSection(section.id)} sx={{ color: 'error.main' }}>
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </>
+            )}
+          </Stack>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 3 }}>
+            {section.items.map((item, i) => (
+              <Paper key={i} variant="outlined" sx={{ p: 3, position: 'relative' }}>
+                {editMode && (
+                  <IconButton
+                    size="small"
+                    onClick={() => removeCustomSectionItem(section.id, i)}
+                    sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'error.main', color: 'white', '&:hover': { bgcolor: 'error.dark' } }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                )}
+                <EditableText value={item.name} onChange={(v) => updateCustomSectionItem(section.id, i, 'name', v)} editMode={editMode} variant="h6" sx={{ fontWeight: 600, mb: 1 }} />
+                <EditableText value={item.description} onChange={(v) => updateCustomSectionItem(section.id, i, 'description', v)} editMode={editMode} sx={{ color: 'text.secondary', fontSize: '0.95rem' }} />
+              </Paper>
+            ))}
+          </Box>
+        </Box>
+      ))}
+
+      {/* Add Section button */}
+      {editMode && (
+        <Box sx={{ mb: 6, textAlign: 'center' }}>
+          <Button variant="outlined" startIcon={<AddIcon />} onClick={addCustomSection}>
+            Add Section
+          </Button>
+        </Box>
+      )}
+
       {/* Contact */}
       <Box component="section">
-        <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: '0.1em', mb: 2, display: 'block' }}>
-          Contact
-        </Typography>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+          <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: '0.1em' }}>
+            Contact
+          </Typography>
+          {editMode && (
+            <IconButton size="small" onClick={addCustomLink}>
+              <AddIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Stack>
         <Stack spacing={1}>
           <Stack direction="row" spacing={1}>
             <Typography sx={{ color: 'text.disabled' }}>Email:</Typography>
@@ -370,6 +480,17 @@ function Portfolio({ editMode, data, updateField, updateExperience, updateProjec
             <Typography sx={{ color: 'text.disabled' }}>LinkedIn:</Typography>
             <EditableText value={data.linkedin} onChange={(v) => updateField('linkedin', v)} editMode={editMode} />
           </Stack>
+          {data.customLinks?.map((link, i) => (
+            <Stack key={i} direction="row" spacing={1} alignItems="center">
+              <EditableText value={link.label + ':'} onChange={(v) => updateCustomLink(i, 'label', v.replace(/:$/, ''))} editMode={editMode} sx={{ color: 'text.disabled' }} />
+              <EditableText value={link.url} onChange={(v) => updateCustomLink(i, 'url', v)} editMode={editMode} />
+              {editMode && (
+                <IconButton size="small" onClick={() => removeCustomLink(i)} sx={{ color: 'error.main' }}>
+                  <CloseIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              )}
+            </Stack>
+          ))}
         </Stack>
       </Box>
     </>
@@ -430,6 +551,18 @@ function PublicProfile({ username }: { username: string }) {
           removeExperience={noopUpdate}
           removeProject={noopUpdate}
           removeSkill={noopUpdate}
+          updateEducation={noopUpdate}
+          addEducation={noopUpdate}
+          removeEducation={noopUpdate}
+          updateCustomSection={noopUpdate}
+          addCustomSection={noopUpdate}
+          removeCustomSection={noopUpdate}
+          addCustomSectionItem={noopUpdate}
+          removeCustomSectionItem={noopUpdate}
+          updateCustomSectionItem={noopUpdate}
+          addCustomLink={noopUpdate}
+          removeCustomLink={noopUpdate}
+          updateCustomLink={noopUpdate}
         />
       ) : (
         <Logs editMode={false} logs={logs} onUpdate={noopUpdate} />
@@ -518,6 +651,63 @@ function App() {
 
   const removeSkill = (index: number) => {
     updatePortfolio({ ...portfolio, skills: portfolio.skills.filter((_, i) => i !== index) })
+  }
+
+  const updateEducation = (index: number, field: string, value: string) => {
+    const newEdu = [...(portfolio.education || [])]
+    newEdu[index] = { ...newEdu[index], [field]: value }
+    updatePortfolio({ ...portfolio, education: newEdu })
+  }
+
+  const addEducation = () => {
+    updatePortfolio({ ...portfolio, education: [...(portfolio.education || []), { institution: "University Name", degree: "Degree", period: "Year - Year", description: "Description" }] })
+  }
+
+  const removeEducation = (index: number) => {
+    updatePortfolio({ ...portfolio, education: (portfolio.education || []).filter((_, i) => i !== index) })
+  }
+
+  const updateCustomSection = (sectionId: string, title: string) => {
+    const sections = (portfolio.customSections || []).map(s => s.id === sectionId ? { ...s, title } : s)
+    updatePortfolio({ ...portfolio, customSections: sections })
+  }
+
+  const addCustomSection = () => {
+    const newSection: CustomSection = { id: Date.now().toString(), title: 'New Section', items: [{ name: 'Item Name', description: 'Item description' }] }
+    updatePortfolio({ ...portfolio, customSections: [...(portfolio.customSections || []), newSection] })
+  }
+
+  const removeCustomSection = (sectionId: string) => {
+    updatePortfolio({ ...portfolio, customSections: (portfolio.customSections || []).filter(s => s.id !== sectionId) })
+  }
+
+  const addCustomSectionItem = (sectionId: string) => {
+    const sections = (portfolio.customSections || []).map(s => s.id === sectionId ? { ...s, items: [...s.items, { name: 'Item Name', description: 'Item description' }] } : s)
+    updatePortfolio({ ...portfolio, customSections: sections })
+  }
+
+  const removeCustomSectionItem = (sectionId: string, itemIndex: number) => {
+    const sections = (portfolio.customSections || []).map(s => s.id === sectionId ? { ...s, items: s.items.filter((_, i) => i !== itemIndex) } : s)
+    updatePortfolio({ ...portfolio, customSections: sections })
+  }
+
+  const updateCustomSectionItem = (sectionId: string, itemIndex: number, field: 'name' | 'description', value: string) => {
+    const sections = (portfolio.customSections || []).map(s => s.id === sectionId ? { ...s, items: s.items.map((item, i) => i === itemIndex ? { ...item, [field]: value } : item) } : s)
+    updatePortfolio({ ...portfolio, customSections: sections })
+  }
+
+  const addCustomLink = () => {
+    updatePortfolio({ ...portfolio, customLinks: [...(portfolio.customLinks || []), { label: 'Website', url: 'https://' }] })
+  }
+
+  const removeCustomLink = (index: number) => {
+    updatePortfolio({ ...portfolio, customLinks: (portfolio.customLinks || []).filter((_, i) => i !== index) })
+  }
+
+  const updateCustomLink = (index: number, field: 'label' | 'url', value: string) => {
+    const links = [...(portfolio.customLinks || [])]
+    links[index] = { ...links[index], [field]: value }
+    updatePortfolio({ ...portfolio, customLinks: links })
   }
 
   const handlePublish = async () => {
@@ -659,6 +849,18 @@ function App() {
             removeExperience={removeExperience}
             removeProject={removeProject}
             removeSkill={removeSkill}
+            updateEducation={updateEducation}
+            addEducation={addEducation}
+            removeEducation={removeEducation}
+            updateCustomSection={updateCustomSection}
+            addCustomSection={addCustomSection}
+            removeCustomSection={removeCustomSection}
+            addCustomSectionItem={addCustomSectionItem}
+            removeCustomSectionItem={removeCustomSectionItem}
+            updateCustomSectionItem={updateCustomSectionItem}
+            addCustomLink={addCustomLink}
+            removeCustomLink={removeCustomLink}
+            updateCustomLink={updateCustomLink}
           />
         ) : (
           <Logs editMode={editMode} logs={logs} onUpdate={updateLogs} />

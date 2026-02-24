@@ -3,17 +3,27 @@ import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase
 import { db } from '../firebase'
 import { sdeTemplate } from '../templates/softwareDev'
 import { bdaTemplate } from '../templates/bda'
+import { customTemplate } from '../templates/custom'
+
+export interface CustomSection {
+  id: string
+  title: string
+  items: { name: string; description: string }[]
+}
 
 export interface PortfolioData {
   name: string
   title: string
   bio: string
   experience: { company: string; role: string; period: string; description: string }[]
+  education?: { institution: string; degree: string; period: string; description: string }[]
   projects: { name: string; description: string }[]
   skills: string[]
   email: string
   github: string
   linkedin: string
+  customLinks?: { label: string; url: string }[]
+  customSections?: CustomSection[]
 }
 
 export interface LogEntry {
@@ -53,10 +63,11 @@ const defaultLogs: LogEntry[] = [
 // Hook for current user's data (editable)
 export function useUserData(userId: string | null, templateId?: string) {
   // Determine which collection to use based on template
-  const collectionName = templateId === 'bda' ? 'bda' : 'sde'
+  const collectionName = templateId === 'bda' ? 'bda' : templateId === 'custom' ? 'custom' : 'sde'
 
   const getDefaultPortfolio = () => {
     if (templateId === 'bda') return bdaTemplate as PortfolioData
+    if (templateId === 'custom') return customTemplate as PortfolioData
     if (templateId === 'sde') return sdeTemplate as PortfolioData
     return defaultPortfolio
   }
@@ -168,7 +179,7 @@ export function usePublicProfile(username: string | null, templateId?:string) {
 
       const userId = usersSnapshot.docs[0].id
 
-      const collectionName = templateId === 'bda' ? 'bda' : 'sde'
+      const collectionName = templateId === 'bda' ? 'bda' : templateId === 'custom' ? 'custom' : 'sde'
       const portfolioDoc = await getDoc(doc(db, collectionName, userId))
       if (portfolioDoc.exists()) {
         const data = portfolioDoc.data() as UserData

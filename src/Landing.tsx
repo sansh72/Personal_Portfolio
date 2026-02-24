@@ -29,57 +29,35 @@ const Template = () => {
                 Choose <span style={{fontStyle:'italic', color:'#8f8f8f'}}>What </span>Describes You
             </Typography>
         </Box>
-        <Stack direction={{ xs: 'column', sm: 'row' }} gap={3}
-            sx={{
-                justifyContent: 'center',
-                alignItems: 'center',
-                px: 2,
-                width: '100%'
-            }}>
-        <Link to="/resume?template=sde" style={{ textDecoration: 'none', color: 'inherit', width: '100%', maxWidth: 300 }}>
-          <Box
-            sx={{
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 2,
-              p: 4,
-              cursor: 'pointer',
-              textAlign: 'center',
-              transition: 'transform 0.2s, border-color 0.2s',
-              '&:hover': {
-                transform: 'scale(1.05)',
-                borderColor: 'primary.main'
-              }
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 500 }}>
-              Software Developer
-            </Typography>
-          </Box>
-        </Link>
-
-        <Link to="/resume?template=bda" style={{ textDecoration: 'none', color: 'inherit', width: '100%', maxWidth: 300 }}>
-          <Box
-            sx={{
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 2,
-              p: 4,
-              cursor: 'pointer',
-              textAlign: 'center',
-              transition: 'transform 0.2s, border-color 0.2s',
-              '&:hover': {
-                transform: 'scale(1.05)',
-                borderColor: 'primary.main'
-              }
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 500 }}>
-              Business Development Associate
-            </Typography>
-          </Box>
-        </Link>
-      </Stack>
+        <Stack direction="row" flexWrap="wrap" justifyContent="center" gap={3} sx={{ px: 2, width: '100%', maxWidth: 800 }}>
+        {[
+          { to: '/resume?template=sde', label: 'Software Developer' },
+          { to: '/resume?template=bda', label: 'Business Development Associate' },
+          { to: '/resume?template=custom', label: 'Custom' }
+        ].map((item) => (
+          <Link key={item.to} to={item.to} style={{ textDecoration: 'none', color: 'inherit', width: 'calc(50% - 12px)', minWidth: 250 }}>
+            <Box
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 2,
+                p: 4,
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'transform 0.2s, border-color 0.2s',
+                '&:hover': {
+                  transform: 'scale(1.05)',
+                  borderColor: 'primary.main'
+                }
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                {item.label}
+              </Typography>
+            </Box>
+          </Link>
+        ))}
+        </Stack>
     </Stack>
     <Box component="footer"
         sx={{
@@ -92,7 +70,7 @@ const Template = () => {
         }}
     >
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Port Flow 2025. All rights reserved.
+            Port Flow 2026. All rights reserved.
         </Typography>
     </Box>
     </ThemeProvider>
