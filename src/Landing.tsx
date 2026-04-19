@@ -1,6 +1,5 @@
 import { Box, Stack, Typography, ThemeProvider, createTheme, CssBaseline, useMediaQuery } from "@mui/material"
 import { Link } from "react-router-dom"
-import ChooseMethod from "./MethodSelector"
 
 const Template = () => {
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
