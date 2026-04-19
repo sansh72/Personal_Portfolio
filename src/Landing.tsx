@@ -1,5 +1,6 @@
 import { Box, Stack, Typography, ThemeProvider, createTheme, CssBaseline, useMediaQuery } from "@mui/material"
 import { Link } from "react-router-dom"
+import ChooseMethod from "./MethodSelector"
 
 const Template = () => {
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)')
@@ -31,11 +32,11 @@ const Template = () => {
         </Box>
         <Stack direction="row" flexWrap="wrap" justifyContent="center" gap={3} sx={{ px: 2, width: '100%', maxWidth: 800 }}>
         {[
-          { to: '/resume?template=sde', label: 'Software Developer' },
-          { to: '/resume?template=bda', label: 'Business Development Associate' },
-          { to: '/resume?template=custom', label: 'Custom' }
+          { to: '/method-selector', label: 'Software Developer', template: 'sde' },
+          { to: '/method-selector', label: 'Business Development Associate', template:'bda' },
+          { to: '/method-selector', label: 'Custom', template:'custom' }
         ].map((item) => (
-          <Link key={item.to} to={item.to} style={{ textDecoration: 'none', color: 'inherit', width: 'calc(50% - 12px)', minWidth: 250 }}>
+          <Link key={item.to} to={item.to} state={{template: item.template}}style={{ textDecoration: 'none', color: 'inherit', width: 'calc(50% - 12px)', minWidth: 250 }}>
             <Box
               sx={{
                 border: '1px solid',
@@ -59,20 +60,21 @@ const Template = () => {
         ))}
         </Stack>
     </Stack>
-    <Box component="footer"
-        sx={{
-            position:'fixed',
-            bottom:0,
-            left:0,
-            right:0,
-            textAlign:'center',
-            py:2
-        }}
-    >
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Port Flow 2026. All rights reserved.
-        </Typography>
-    </Box>
+      <Box component="footer"
+          sx={{
+              position:'fixed',
+              bottom:0,
+              left:0,
+              right:0,
+              textAlign:'center',
+              py:2
+          }}
+      >
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Port Flow 2026. All rights reserved.
+          </Typography>
+      </Box>
+    
     </ThemeProvider>
   )
 }

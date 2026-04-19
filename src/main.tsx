@@ -6,6 +6,7 @@ import { Analytics } from '@vercel/analytics/react'
 import './index.css'
 import App from './App'
 import Template from './Landing'
+import ChooseMethod from './MethodSelector'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -14,6 +15,7 @@ createRoot(document.getElementById('root')!).render(
         <Analytics />
         <Routes>
           <Route path="/" element={<Template />} />
+          <Route path="/method-selector" element={<ChooseMethod />} />
           <Route path="/resume" element={<App />} />
           <Route path="/:username" element={<App />} />
         </Routes>

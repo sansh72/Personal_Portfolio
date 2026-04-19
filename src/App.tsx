@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Home } from '@mui/icons-material'
 import './App.css'
@@ -584,7 +584,13 @@ function App() {
     isViewingOwnProfile ? (user?.uid || null) : null,
     template
   )
-
+  const location = useLocation()
+  useEffect(()=>{
+    if(location.state?.parsedResume){
+      updatePortfolio(location.state.parsedResume)
+      window.history.replaceState({}, '')
+    }
+  }, [])
   const [editMode, setEditMode] = useState(false)
   const [view, setView] = useState<'portfolio' | 'logs'>('portfolio')
 
@@ -592,11 +598,22 @@ function App() {
   useEffect(() => {
     if (!user) setEditMode(false)
   }, [user])
+
+  
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
     severity: 'success'
   })
+
+  useEffect(() => {
+    if (location.state?.parsedResume) {
+      setSnackbar({ open: true, message: 'Resume uploaded successfully!', severity: 'success' })
+    }
+    if (location.state?.alreadyFound) {
+      setSnackbar({ open: true, message: 'Portfolio already found!', severity: 'success' })
+    }
+  }, [])
 
   const theme = createTheme({
     palette: {
