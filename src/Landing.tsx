@@ -47,7 +47,7 @@ const Template = () => {
                 transition: 'transform 0.2s, border-color 0.2s',
                 '&:hover': {
                   transform: 'scale(1.05)',
-                  borderColor: 'primary.main'
+                  borderColor: '#ffffff'
                 }
               }}
             >

@@ -1,8 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Home } from '@mui/icons-material'
+import { GitHub, Home } from '@mui/icons-material'
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ProfileFetcher from './ProfileFetcher/Realtime'
 import './App.css'
+import * as React from 'react';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+import Heatmap from './ProfileFetcher/HeatMap';
+import HeatMapCom from './ProfileFetcher/HeatMapNew';
+import HeatmapSkeleton from './Skeleton.tsx/HeatMap';
 import {
   Box,
   Typography,
@@ -236,7 +246,56 @@ function Portfolio({ editMode, data, updateField, updateExperience, updateProjec
   addCustomLink: () => void
   removeCustomLink: (index: number) => void
   updateCustomLink: (index: number, field: 'label' | 'url', value: string) => void
+
 }) {
+    const [contributions, setContributions] = useState(false)
+    const { user} = useAuth()
+    const [loading, setLoading] = useState(false)
+    
+    const [weeks, setWeeks] = useState<any[]>([])
+    const [month, setMonth] = useState<any[]>([])
+
+    const fetchFromGithub:any = async () => {
+    setLoading(true)
+    console.log(loading)
+    const results = await fetch(`http://localhost:8000/github/contributions?uid=${encodeURIComponent(user?.uid)}`)
+    const response = await results.json()
+    console.log(response.data.viewer)
+    setLoading(false)
+    setWeeks(response.data.viewer.contributionsCollection.contributionCalendar.weeks.slice(-24))
+    setContributions(true)
+  }
+
+const Month = () => {
+  if (!weeks.length) return []
+  const monthArr: { contributionDays: any[] }[] = [{ contributionDays: [] }]
+  let monthIndex = 0
+  let currentMonth = new Date(weeks[0].contributionDays[0].date).getMonth()
+
+  for (let i = 0; i < weeks.length; i++) {
+    for (let j = 0; j < weeks[i].contributionDays.length; j++) {   // start at 0
+      const day = weeks[i].contributionDays[j]
+      const m = new Date(day.date).getMonth()
+
+      if (m !== currentMonth) {   // month changed → open a new bucket
+        monthIndex++
+        monthArr[monthIndex] = { contributionDays: [] }
+        currentMonth = m
+      }
+      monthArr[monthIndex].contributionDays.push(day)  // every day gets pushed
+    }
+  }
+
+  return monthArr
+}
+
+  useEffect(()=>{
+    // console.log('Inside here')
+    const value = Month()
+    console.log(value)
+    setMonth(value)
+    
+  }, [weeks])
   return (
     <>
       {/* Header */}
@@ -402,6 +461,37 @@ function Portfolio({ editMode, data, updateField, updateExperience, updateProjec
             />
           ))}
         </Stack>
+      </Box>
+      <Box component="section" sx={{ mb: 6 }}>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+          <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: '0.1em' }}>
+            Get Your Commit History HeatMap 
+            {
+              contributions && <Typography variant="overline" sx={{ color: '#ffffff', letterSpacing: '0.1em' }}> (Last 24 Weeks)</Typography>
+            }
+          </Typography>
+          
+        </Stack>
+
+        {!contributions && !loading &&
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Button onClick={()=>{fetchFromGithub() }}>
+              Fetch From Github
+            </Button>
+          </Stack>
+        }
+        {loading &&
+          <HeatmapSkeleton></HeatmapSkeleton>
+        }
+
+        {contributions &&
+          <Stack direction="row" spacing={0.1}>
+                  {month.map((month, index) => (
+                      <HeatMapCom key={index} month={month} />
+                  ))}
+          </Stack>
+        }
+          
       </Box>
 
       {/* Custom Sections */}
@@ -584,6 +674,13 @@ function App() {
     isViewingOwnProfile ? (user?.uid || null) : null,
     template
   )
+  const [open, setOpen] = useState(false)
+
+  useEffect(()=>{
+    console.log('Called Once')
+    ProfileFetcher()
+  },[])
+  
   const location = useLocation()
   useEffect(()=>{
     if(location.state?.parsedResume){
@@ -623,6 +720,8 @@ function App() {
       fontFamily: 'system-ui, -apple-system, sans-serif',
     },
   })
+
+  const [snacking, setSnacking] = useState(false)
 
   const updateField = <K extends keyof PortfolioData>(field: K, value: PortfolioData[K]) => {
     updatePortfolio({ ...portfolio, [field]: value })
@@ -751,6 +850,16 @@ function App() {
       setSnackbar({ open: true, message: 'Failed to unpublish', severity: 'error' })
     }
   }
+  const [githubConnected, setGithubConnected] = useState(false)
+  const githubConnection = async () => {
+    const result = await fetch(`http://localhost:8000/github/status?uid=${encodeURIComponent(user?.uid)}`)
+    const response = await result.json()
+    console.log(response)
+  }
+  useEffect(()=>{
+    githubConnection()
+    setGithubConnected(true)
+  },[user?.uid])
 
   if (authLoading || dataLoading) {
     return (
@@ -762,6 +871,15 @@ function App() {
       </ThemeProvider>
     )
   }
+  const handleClose = () => {
+    setOpen(false);
+  };
+  const handleOpen = () => {
+    setOpen(true);
+  };
+  const handleConnectGithub = () => {
+    window.location.href = `http://localhost:8000/auth/github/login?uid=${encodeURIComponent(user?.uid)}`;
+  };
 
   return (
     <ThemeProvider theme={theme}>
@@ -806,10 +924,13 @@ function App() {
           </Stack>
           </Box>
 
+         
+          
           {/* Right side - Actions */}
           {isViewingOwnProfile && (
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               {user ? (
+                <>
                 <Button
                   variant={editMode ? 'contained' : 'outlined'}
                   size="small"
@@ -817,6 +938,14 @@ function App() {
                 >
                   {editMode ? 'Exit' : 'Edit'}
                 </Button>
+                <Button
+                  variant={editMode ? 'contained' : 'outlined'}
+                  size="small"
+                  onClick={handleOpen}
+                  >
+                Sync
+                </Button>
+                </>
               ) : (
                 <Button
                   variant="outlined"
@@ -848,6 +977,60 @@ function App() {
             </Stack>
           )}
         </Stack>
+
+        <Dialog
+          open={open}
+          onClose={handleClose}
+          aria-labelledby="alert-dialog-title"
+          aria-describedby="alert-dialog-description"
+          role="alertdialog"
+        >
+          <DialogTitle id="alert-dialog-title">
+            {"Connect To Sync Platforms"}
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText id="alert-dialog-description">
+              Connect your platforms to get realtime updates in your portfolio Website
+              <Stack sx={{
+                alignContent:'center'
+              }}>
+                <Button onClick={handleConnectGithub}
+                sx={{
+                  maxWidth:100,
+                  ml:25
+                }}
+                disabled={githubConnected}>
+                  <img
+                    src="src/assets/github.webp"
+                    alt="GitHub"
+                    width="80"
+                    height="80"
+                  />
+                  {githubConnected && (
+                    <CheckCircleIcon
+                      sx={{
+                        position: "absolute",
+                        bottom: 0,
+                        right: 0,
+                        color: "success.main",
+                        backgroundColor: "white",
+                        borderRadius: "50%",
+                        fontSize: 28,
+                      }}
+                    />
+                  )}
+                </Button>
+              </Stack>
+            </DialogContentText>
+          </DialogContent>
+      </Dialog>
+
+      <Snackbar
+        open={snacking}
+        autoHideDuration={4000}
+        onClose={() => setSnacking(false)}
+        message="GitHub connected successfully!"
+      />
 
         {/* Content */}
         {isViewingPublicProfile ? (
