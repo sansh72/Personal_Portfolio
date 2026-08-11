@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Home } from '@mui/icons-material'
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import githubLogo from './assets/github.webp'
 import ProfileFetcher from './ProfileFetcher/Realtime'
 import './App.css'
 import * as React from 'react';
@@ -39,6 +40,10 @@ import GoogleIcon from '@mui/icons-material/Google'
 import { useAuth } from './contexts/AuthContext'
 import { useUserData, usePublicProfile } from './hooks/useUserData'
 import type { PortfolioData, LogEntry, CustomSection } from './hooks/useUserData'
+
+const BACKEND_URL = import.meta.env.DEV
+  ? 'http://localhost:8000'
+  : 'https://portflow-backend-m7jo.onrender.com'
 
 function EditableText({
   value,
@@ -257,7 +262,7 @@ function Portfolio({ editMode, data, updateField, updateExperience, updateProjec
     const fetchFromGithub:any = async () => {
     setLoading(true)
     console.log(loading)
-    const results = await fetch(`http://localhost:8000/github/contributions?uid=${encodeURIComponent(user?.uid ?? '')}`)
+    const results = await fetch(`${BACKEND_URL}/github/contributions?uid=${encodeURIComponent(user?.uid ?? '')}`)
     const response = await results.json()
     console.log(response.data.viewer)
     setLoading(false)
@@ -851,13 +856,13 @@ function App() {
   }
   const [githubConnected, setGithubConnected] = useState(false)
   const githubConnection = async () => {
-    const result = await fetch(`http://localhost:8000/github/status?uid=${encodeURIComponent(user?.uid ?? '')}`)
+    if (!user?.uid) return
+    const result = await fetch(`${BACKEND_URL}/github/status?uid=${encodeURIComponent(user?.uid ?? '')}`)
     const response = await result.json()
-    console.log(response)
+    setGithubConnected(response.connected === true)
   }
   useEffect(()=>{
     githubConnection()
-    setGithubConnected(true)
   },[user?.uid])
 
   if (authLoading || dataLoading) {
@@ -877,7 +882,7 @@ function App() {
     setOpen(true);
   };
   const handleConnectGithub = () => {
-    window.location.href = `http://localhost:8000/auth/github/login?uid=${encodeURIComponent(user?.uid ?? '')}`;
+    window.location.href = `${BACKEND_URL}/auth/github/login?uid=${encodeURIComponent(user?.uid ?? '')}`;
   };
 
   return (
@@ -1000,7 +1005,7 @@ function App() {
                 }}
                 disabled={githubConnected}>
                   <img
-                    src="src/assets/github.webp"
+                    src={githubLogo}
                     alt="GitHub"
                     width="80"
                     height="80"
