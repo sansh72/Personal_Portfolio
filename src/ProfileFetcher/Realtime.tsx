@@ -1,7 +1,3 @@
-import { useEffect } from "react"
-import { resume } from "react-dom/server"
-
-
 async function ProfileFetcher(){
     
     const url = 'https://api.github.com/users/sansh72'

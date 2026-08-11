@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useParams, useNavigate } from 'react-router-dom'
-import { GitHub, Home } from '@mui/icons-material'
+import { Home } from '@mui/icons-material'
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ProfileFetcher from './ProfileFetcher/Realtime'
 import './App.css'
@@ -10,7 +10,6 @@ import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import Heatmap from './ProfileFetcher/HeatMap';
 import HeatMapCom from './ProfileFetcher/HeatMapNew';
 import HeatmapSkeleton from './Skeleton.tsx/HeatMap';
 import {
@@ -258,7 +257,7 @@ function Portfolio({ editMode, data, updateField, updateExperience, updateProjec
     const fetchFromGithub:any = async () => {
     setLoading(true)
     console.log(loading)
-    const results = await fetch(`http://localhost:8000/github/contributions?uid=${encodeURIComponent(user?.uid)}`)
+    const results = await fetch(`http://localhost:8000/github/contributions?uid=${encodeURIComponent(user?.uid ?? '')}`)
     const response = await results.json()
     console.log(response.data.viewer)
     setLoading(false)
@@ -852,7 +851,7 @@ function App() {
   }
   const [githubConnected, setGithubConnected] = useState(false)
   const githubConnection = async () => {
-    const result = await fetch(`http://localhost:8000/github/status?uid=${encodeURIComponent(user?.uid)}`)
+    const result = await fetch(`http://localhost:8000/github/status?uid=${encodeURIComponent(user?.uid ?? '')}`)
     const response = await result.json()
     console.log(response)
   }
@@ -878,7 +877,7 @@ function App() {
     setOpen(true);
   };
   const handleConnectGithub = () => {
-    window.location.href = `http://localhost:8000/auth/github/login?uid=${encodeURIComponent(user?.uid)}`;
+    window.location.href = `http://localhost:8000/auth/github/login?uid=${encodeURIComponent(user?.uid ?? '')}`;
   };
 
   return (

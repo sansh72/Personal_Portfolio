@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Stack, Grid, Typography, Box } from "@mui/material";
+import { Stack, Box } from "@mui/material";
 
 
 const Heatmap: any = () =>{
