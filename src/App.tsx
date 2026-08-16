@@ -37,14 +37,13 @@ import AddIcon from '@mui/icons-material/Add'
 import CloseIcon from '@mui/icons-material/Close'
 import PublishIcon from '@mui/icons-material/Publish'
 import GoogleIcon from '@mui/icons-material/Google'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import { useAuth } from './contexts/AuthContext'
 import { useUserData, usePublicProfile } from './hooks/useUserData'
 import type { PortfolioData, LogEntry, CustomSection } from './hooks/useUserData'
 
-const BACKEND_URL = import.meta.env.DEV
-  ? 'http://localhost:8000'
-  : 'https://portflow-backend-m7jo.onrender.com'
-
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
+  
 function EditableText({
   value,
   onChange,
@@ -423,7 +422,15 @@ const Month = () => {
           </Stack>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 3 }}>
             {data.projects.map((project, i) => (
-              <Paper key={i} variant="outlined" sx={{ p: 3, position: 'relative' }}>
+              <Paper key={i} variant="outlined" sx={{
+                p: 3,
+                position: 'relative',
+                height: editMode ? 'auto' : 180,
+                overflow: 'hidden',
+                '&:hover': editMode ? {} : { overflowY: 'auto' },
+                '&::-webkit-scrollbar': { width: '6px' },
+                '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(128,128,128,0.4)', borderRadius: '3px' },
+              }}>
                 {editMode && (
                   <IconButton
                     size="small"
@@ -727,6 +734,30 @@ function App() {
 
   const [snacking, setSnacking] = useState(false)
 
+  const resumeInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingResume, setUploadingResume] = useState(false)
+
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingResume(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch(`${BACKEND_URL}/parse-resume`, { method: 'POST', body: formData })
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      updatePortfolio(data)
+      setSnackbar({ open: true, message: 'Resume parsed and applied!', severity: 'success' })
+    } catch (err) {
+      console.error(err)
+      setSnackbar({ open: true, message: 'Failed to parse resume. Try again in a minute.', severity: 'error' })
+    } finally {
+      setUploadingResume(false)
+      e.target.value = ''
+    }
+  }
+
   const updateField = <K extends keyof PortfolioData>(field: K, value: PortfolioData[K]) => {
     updatePortfolio({ ...portfolio, [field]: value })
   }
@@ -949,6 +980,22 @@ function App() {
                   >
                 Sync
                 </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<PictureAsPdfIcon />}
+                  onClick={() => resumeInputRef.current?.click()}
+                  disabled={uploadingResume}
+                >
+                  {uploadingResume ? 'Parsing…' : 'Upload Resume'}
+                </Button>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  ref={resumeInputRef}
+                  style={{ display: 'none' }}
+                  onChange={handleResumeUpload}
+                />
                 </>
               ) : (
                 <Button
@@ -1027,6 +1074,17 @@ function App() {
               </Stack>
             </DialogContentText>
           </DialogContent>
+      </Dialog>
+
+      <Dialog open={uploadingResume} PaperProps={{ sx: { backgroundColor: '#1a1a1a', color: '#ffffff' } }}>
+        <DialogContent>
+          <Stack alignItems="center" gap={2} sx={{ p: 2 }}>
+            <CircularProgress sx={{ color: '#ffffff' }} />
+            <Typography sx={{ fontSize: { xs: 18, sm: 24, md: 30 }, fontFamily: 'ui-sans-serif', fontWeight: 500 }}>
+              Analysing your <span style={{ fontStyle: 'italic', color: '#8f8f8f' }}>Resume</span>
+            </Typography>
+          </Stack>
+        </DialogContent>
       </Dialog>
 
       <Snackbar
