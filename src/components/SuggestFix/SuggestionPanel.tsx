@@ -1,9 +1,18 @@
-import { useState } from 'react'
-import { Alert, Box, Button, CircularProgress, IconButton, Paper, Stack, Typography } from '@mui/material'
+import { useEffect, useState } from 'react'
+import {
+  Alert, Box, Button, CircularProgress, Collapse, Fade, IconButton,
+  Paper, Skeleton, Stack, Typography, useMediaQuery,
+} from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import { SuggestionTags } from './SuggestionTags'
+import { useTypewriter } from '../../hooks/useTypewriter'
 import type { SuggestFixState } from '../../hooks/useSuggestFix'
 import type { QuotaStatus, Suggestion } from '../../services/suggestionsApi'
+
+const CTA_SX = { textTransform: 'none' as const }
+
+/** text types out → chip skeletons → chips fade in → Apply button. */
+type Stage = 'text' | 'skeleton' | 'chips' | 'ready'
 
 export function SuggestionPanel({
   state,
@@ -28,6 +37,33 @@ export function SuggestionPanel({
   // suggestion starts with nothing selected.
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
 
+  // Respect the OS setting: an animation someone asked not to see is worse
+  // than no animation.
+  const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+  const [stage, setStage] = useState<Stage>(reduceMotion ? 'ready' : 'text')
+
+  const { shown, done } = useTypewriter(suggestion?.analysis ?? '', { instant: reduceMotion })
+
+  // Each step schedules the next. setState only happens in the timeout
+  // callback, never synchronously in an effect body.
+  useEffect(() => {
+    if (stage !== 'text' || !done) return
+    const t = setTimeout(() => setStage('skeleton'), 250)
+    return () => clearTimeout(t)
+  }, [stage, done])
+
+  useEffect(() => {
+    if (stage !== 'skeleton') return
+    const t = setTimeout(() => setStage('chips'), 650)
+    return () => clearTimeout(t)
+  }, [stage])
+
+  useEffect(() => {
+    if (stage !== 'chips') return
+    const t = setTimeout(() => setStage('ready'), 450)
+    return () => clearTimeout(t)
+  }, [stage])
+
   if (state === 'QUOTA_REACHED') {
     return (
       <Paper variant="outlined" sx={{ p: 2, mt: 1.5, borderRadius: 2 }}>
@@ -43,7 +79,7 @@ export function SuggestionPanel({
         </Typography>
         <Stack direction="row" spacing={1}>
           {quota?.plan !== 'pro' && onUpgrade && (
-            <Button size="small" variant="contained" onClick={onUpgrade} sx={{ textTransform: 'none' }}>
+            <Button size="small" variant="contained" onClick={onUpgrade} sx={CTA_SX}>
               Upgrade for more credits
             </Button>
           )}
@@ -92,21 +128,54 @@ export function SuggestionPanel({
       </Stack>
 
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2, lineHeight: 1.6 }}>
-        {suggestion.analysis}
+        {shown}
+        {!done && (
+          <Box
+            component="span"
+            sx={{
+              display: 'inline-block', width: '0.5em', height: '1em', ml: '2px',
+              verticalAlign: 'text-bottom', bgcolor: 'text.disabled',
+              animation: 'sfCaret 1s steps(2) infinite',
+              '@keyframes sfCaret': { '50%': { opacity: 0 } },
+            }}
+          />
+        )}
       </Typography>
 
-      <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block', mb: 1 }}>
-        Suggested improvements
-      </Typography>
+      <Collapse in={stage !== 'text'} timeout={300}>
+        <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block', mb: 1 }}>
+          Suggested improvements
+        </Typography>
 
-      <SuggestionTags
-        tags={suggestion.suggested_tags}
-        labels={suggestion.tag_labels}
-        selected={selectedTag}
-        onSelect={setSelectedTag}
-        disabled={applying}
-      />
+        {stage === 'skeleton' ? (
+          // Same shape and rhythm as the real chips, so nothing jumps on swap.
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+            {suggestion.suggested_tags.map((tag, i) => (
+              <Skeleton
+                key={tag}
+                variant="rounded"
+                height={24}
+                width={[110, 96, 124, 108, 100, 118][i % 6]}
+                sx={{ borderRadius: 999 }}
+              />
+            ))}
+          </Stack>
+        ) : (
+          <Fade in timeout={450}>
+            <Box>
+              <SuggestionTags
+                tags={suggestion.suggested_tags}
+                labels={suggestion.tag_labels}
+                selected={selectedTag}
+                onSelect={setSelectedTag}
+                disabled={applying}
+              />
+            </Box>
+          </Fade>
+        )}
+      </Collapse>
 
+      <Collapse in={stage === 'ready'} timeout={300}>
       <Box>
         <Button
           size="small"
@@ -114,7 +183,7 @@ export function SuggestionPanel({
           disabled={!selectedTag || applying}
           onClick={() => selectedTag && onApply(selectedTag)}
           startIcon={applying ? <CircularProgress size={14} color="inherit" /> : undefined}
-          sx={{ textTransform: 'none' }}
+          sx={CTA_SX}
         >
           {applying ? 'Applying fix…' : 'Apply Fix'}
         </Button>
@@ -122,6 +191,7 @@ export function SuggestionPanel({
           Applying is free
         </Typography>
       </Box>
+      </Collapse>
     </Paper>
   )
 }

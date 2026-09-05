@@ -15,10 +15,12 @@ export interface CustomSection {
 export interface PortfolioData {
   name: string
   title: string
+  /** Uploaded profile picture. Falls back to the Google account photo. */
+  avatarUrl?: string
   bio: string
   experience: { company: string; role: string; period: string; description: string }[]
   education?: { institution: string; degree: string; period: string; description: string }[]
-  projects: { name: string; description: string }[]
+  projects: { name: string; description: string; link?: string }[]
   skills: string[]
   email: string
   github: string
@@ -84,7 +86,19 @@ export function useUserData(userId: string | null, templateId?: string) {
   const [logs, setLogs] = useState<LogEntry[]>(defaultLogs)
   const [isPublished, setIsPublished] = useState(false)
   const [sectionVersions, setSectionVersions] = useState<Record<string, number>>({})
-  const [loading, setLoading] = useState(true)
+
+  /**
+   * Which (user, template) pair the data in state actually belongs to.
+   *
+   * Derived rather than a plain `loading` flag: on a fresh load `userId` is
+   * null until Firebase auth resolves, so the first pass finishes and clears
+   * the flag while holding template defaults. A second pass then starts for
+   * the real uid with nothing marking it as loading, which is what let the
+   * empty template render for a moment before real data arrived.
+   */
+  const dataKey = `${userId ?? 'anon'}:${collectionName}`
+  const [loadedKey, setLoadedKey] = useState<string | null>(null)
+  const loading = loadedKey !== dataKey
 
   useEffect(() => {
     if (!userId) {
@@ -99,7 +113,7 @@ export function useUserData(userId: string | null, templateId?: string) {
         setPortfolio(getDefaultPortfolio())
       }
       if (savedLogs) setLogs(JSON.parse(savedLogs))
-      setLoading(false)
+      setLoadedKey(dataKey)
       return
     }
 
@@ -116,10 +130,10 @@ export function useUserData(userId: string | null, templateId?: string) {
         // No saved data, use template defaults
         setPortfolio(getDefaultPortfolio())
       }
-      setLoading(false)
+      setLoadedKey(dataKey)
     }
     loadData()
-  }, [userId, collectionName])
+  }, [userId, collectionName, dataKey])
 
   const saveData = async (
     newPortfolio: PortfolioData,

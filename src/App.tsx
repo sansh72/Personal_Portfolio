@@ -2,6 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Home } from '@mui/icons-material'
+import MenuIcon from '@mui/icons-material/Menu'
+import ArticleIcon from '@mui/icons-material/Article'
+import LinkIcon from '@mui/icons-material/Link'
+import EditIcon from '@mui/icons-material/Edit'
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import githubLogo from './assets/github.webp'
 import ProfileFetcher from './ProfileFetcher/Realtime'
@@ -9,7 +14,6 @@ import './App.css'
 import * as React from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import HeatMapCom from './ProfileFetcher/HeatMapNew';
 import HeatmapSkeleton from './Skeleton.tsx/HeatMap';
@@ -31,7 +35,11 @@ import {
   Avatar,
   CircularProgress,
   Snackbar,
-  Alert
+  Alert,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import CloseIcon from '@mui/icons-material/Close'
@@ -42,10 +50,12 @@ import { useAuth } from './contexts/AuthContext'
 import { useUserData, usePublicProfile } from './hooks/useUserData'
 import type { PortfolioData, LogEntry, CustomSection } from './hooks/useUserData'
 import { useSuggestFix } from './hooks/useSuggestFix'
-import { SuggestFixButton, SuggestionPanel, QuotaIndicator, UpgradeDialog } from './components/SuggestFix'
+import { SuggestFixButton, SuggestionPanel, QuotaIndicator, UpgradeDialog, CollectionReviewPanel } from './components/SuggestFix'
 import { MIN_SECTION_CHARS, sectionPath } from './utils/sectionPaths'
+import { PortfolioSkeleton } from './components/PortfolioSkeleton'
+import { ProfileDialog } from './components/ProfileDialog'
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
+import { BACKEND_URL } from './config'
   
 function EditableText({
   value,
@@ -227,6 +237,11 @@ function Logs({ editMode, logs, onUpdate }: {
   )
 }
 
+const PLAN_LABELS: Record<string, string> = { free: 'Free', basic: 'Basic', pro: 'Pro' }
+
+/** Skills shown before the "+N more" toggle. */
+const SKILLS_PREVIEW_COUNT = 10
+
 type SuggestFixApi = ReturnType<typeof useSuggestFix> & { onUpgrade?: () => void }
 
 /**
@@ -246,7 +261,7 @@ function SectionFix({ api, path, text }: {
   const tooShort = (text ?? '').trim().length < MIN_SECTION_CHARS
 
   return (
-    <Box sx={{ mt: 0.5 }}>
+    <Box sx={{ mt: 1.5 }}>
       <SuggestFixButton
         onClick={() => api.analyze(path)}
         analyzing={isActive && api.state === 'ANALYZING'}
@@ -270,8 +285,10 @@ function SectionFix({ api, path, text }: {
   )
 }
 
-function Portfolio({ suggestFix, editMode, data, updateField, updateExperience, updateProject, updateSkill, addExperience, addProject, addSkill, removeExperience, removeProject, removeSkill, updateEducation, addEducation, removeEducation, updateCustomSection, addCustomSection, removeCustomSection, addCustomSectionItem, removeCustomSectionItem, updateCustomSectionItem, addCustomLink, removeCustomLink, updateCustomLink }: {
+function Portfolio({ suggestFix, onSyncGithub, githubConnected, editMode, data, updateField, updateExperience, updateProject, updateSkill, addExperience, addProject, addSkill, removeExperience, removeProject, removeSkill, updateEducation, addEducation, removeEducation, updateCustomSection, addCustomSection, removeCustomSection, addCustomSectionItem, removeCustomSectionItem, updateCustomSectionItem, addCustomLink, removeCustomLink, updateCustomLink }: {
   suggestFix?: SuggestFixApi
+  onSyncGithub?: () => void
+  githubConnected?: boolean
   editMode: boolean
   data: PortfolioData
   updateField: <K extends keyof PortfolioData>(field: K, value: PortfolioData[K]) => void
@@ -299,6 +316,13 @@ function Portfolio({ suggestFix, editMode, data, updateField, updateExperience, 
 
 }) {
     const [contributions, setContributions] = useState(false)
+    const [showAllSkills, setShowAllSkills] = useState(false)
+    // Cards are a fixed height, so the full text lives in a dialog rather than
+    // being unreachable behind the fade.
+    const [openProject, setOpenProject] = useState<number | null>(null)
+    // The link field is opt-in: no link and nobody asking for one means no
+    // empty input sitting there.
+    const [editingLink, setEditingLink] = useState(false)
     const { user} = useAuth()
     const [loading, setLoading] = useState(false)
     
@@ -350,13 +374,25 @@ const Month = () => {
     <>
       {/* Header */}
       <Box component="header" sx={{ mb: 8 }}>
-        <EditableText
-          value={data.name}
-          onChange={(v) => updateField('name', v)}
-          editMode={editMode}
-          variant="h3"
-          sx={{ fontWeight: 600, letterSpacing: '-0.02em', mb: 1 }}
-        />
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={2}
+          flexWrap="wrap"
+          useFlexGap
+          sx={{ mb: 1 }}
+        >
+          <EditableText
+            value={data.name}
+            onChange={(v) => updateField('name', v)}
+            editMode={editMode}
+            variant="h3"
+            sx={{ fontWeight: 600, letterSpacing: '-0.02em' }}
+          />
+          {suggestFix && (
+            <QuotaIndicator quota={suggestFix.quota} onUpgrade={suggestFix.onUpgrade} />
+          )}
+        </Stack>
         <EditableText
           value={data.title}
           onChange={(v) => updateField('title', v)}
@@ -365,10 +401,6 @@ const Month = () => {
           sx={{ color: 'text.secondary', fontWeight: 400 }}
         />
       </Box>
-
-      {suggestFix && (
-        <QuotaIndicator quota={suggestFix.quota} onUpgrade={suggestFix.onUpgrade} />
-      )}
 
       {/* About */}
       <Box component="section" sx={{ mb: 6 }}>
@@ -454,7 +486,6 @@ const Month = () => {
                 </Stack>
                 <EditableText value={edu.period} onChange={(v) => updateEducation(i, 'period', v)} editMode={editMode} variant="body2" sx={{ color: 'text.disabled', mb: 1 }} />
                 <EditableText value={edu.description} onChange={(v) => updateEducation(i, 'description', v)} editMode={editMode} sx={{ color: 'text.secondary', lineHeight: 1.6 }} />
-                <SectionFix api={suggestFix} path={sectionPath.education(i)} text={edu.description} />
               </Box>
             ))}
           </Stack>
@@ -473,33 +504,197 @@ const Month = () => {
                 <AddIcon fontSize="small" />
               </IconButton>
             )}
+            {suggestFix && data.projects.length >= 2 && (
+              <SuggestFixButton
+                onClick={() => suggestFix.analyzeCollection('projects')}
+                analyzing={
+                  suggestFix.activeSectionId === 'collection:projects' &&
+                  suggestFix.state === 'ANALYZING'
+                }
+                disabled={suggestFix.isBusy}
+                label="Which to keep?"
+              />
+            )}
           </Stack>
+
+          {suggestFix?.activeSectionId === 'collection:projects' && (
+            <CollectionReviewPanel
+              state={suggestFix.state}
+              review={suggestFix.review}
+              error={suggestFix.error}
+              quota={suggestFix.quota}
+              onDismiss={suggestFix.dismiss}
+              onRetry={suggestFix.retry}
+              onUpgrade={suggestFix.onUpgrade}
+            />
+          )}
+
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 3 }}>
-            {data.projects.map((project, i) => (
+            {data.projects.map((project, i) => {
+              return (
               <Paper key={i} variant="outlined" sx={{
                 p: 3,
+                // Breathing room under the text so it never runs into the edge.
+                pb: 2.5,
                 position: 'relative',
-                height: editMode ? 'auto' : 180,
+                display: 'flex',
+                flexDirection: 'column',
+                height: editMode ? 'auto' : 260,
                 overflow: 'hidden',
-                '&:hover': editMode ? {} : { overflowY: 'auto' },
-                '&::-webkit-scrollbar': { width: '6px' },
-                '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(128,128,128,0.4)', borderRadius: '3px' },
-              }}>
+                ...(editMode ? {} : {
+                  cursor: 'pointer',
+                  transition: 'border-color 0.2s',
+                  '&:hover': { borderColor: 'text.disabled' },
+                }),
+              }}
+              onClick={editMode ? undefined : () => setOpenProject(i)}
+              className="project-card">
                 {editMode && (
-                  <IconButton
-                    size="small"
-                    onClick={() => removeProject(i)}
-                    sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'error.main', color: 'white', '&:hover': { bgcolor: 'error.dark' } }}
-                  >
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
+                  <>
+                    <IconButton
+                      size="small"
+                      onClick={() => setOpenProject(i)}
+                      title="Add a link"
+                      sx={{ position: 'absolute', top: 8, right: 44 }}
+                    >
+                      <LinkIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={() => removeProject(i)}
+                      sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'error.main', color: 'white', '&:hover': { bgcolor: 'error.dark' } }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </>
                 )}
-                <EditableText value={project.name} onChange={(v) => updateProject(i, 'name', v)} editMode={editMode} variant="h6" sx={{ fontWeight: 600, mb: 1 }} />
-                <EditableText value={project.description} onChange={(v) => updateProject(i, 'description', v)} editMode={editMode} sx={{ color: 'text.secondary', fontSize: '0.95rem' }} />
-                <SectionFix api={suggestFix} path={sectionPath.project(i)} text={project.description} />
+                <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mb: 1 }}>
+                  <EditableText value={project.name} onChange={(v) => updateProject(i, 'name', v)} editMode={editMode} variant="h6" sx={{ fontWeight: 600 }} />
+                  {(project.link || '').trim() && (
+                    <OpenInNewIcon sx={{ fontSize: 14, color: 'text.disabled', mt: 0.75, flexShrink: 0 }} />
+                  )}
+                </Stack>
+                <Box
+                  sx={{
+                    flexGrow: 1,
+                    minHeight: 0,
+                    mb: 1,
+                    overflow: 'hidden',
+                    position: 'relative',
+                    // Fades the cut edge instead of slicing a line in half.
+                    // Over short text it sits on empty background and is
+                    // invisible, so it only ever shows where text is clipped.
+                    ...(editMode ? {} : {
+                      '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: '1.8em',
+                        background: (t: import('@mui/material').Theme) =>
+                          `linear-gradient(to bottom, transparent, ${t.palette.background.paper})`,
+                        pointerEvents: 'none',
+                      },
+                    }),
+                  }}
+                >
+                  <EditableText
+                    value={project.description}
+                    onChange={(v) => updateProject(i, 'description', v)}
+                    editMode={editMode}
+                    sx={{ color: 'text.secondary', fontSize: '0.95rem' }}
+                  />
+                </Box>
               </Paper>
-            ))}
+              )
+            })}
           </Box>
+
+          <Dialog
+            open={openProject !== null}
+            onClose={() => { setOpenProject(null); setEditingLink(false) }}
+            maxWidth="sm"
+            fullWidth
+            slotProps={{ paper: { sx: { bgcolor: 'background.default', backgroundImage: 'none', border: 1, borderColor: 'divider', borderRadius: 2 } } }}
+          >
+            {openProject !== null && data.projects[openProject] && (() => {
+              const project = data.projects[openProject]
+              const href = (project.link || '').trim()
+              return (
+                <>
+                  <DialogTitle sx={{ fontWeight: 600, pr: 6 }}>
+                    <EditableText
+                      value={project.name}
+                      onChange={(v) => updateProject(openProject, 'name', v)}
+                      editMode={editMode}
+                      variant="h6"
+                      sx={{ fontWeight: 600 }}
+                    />
+                    <IconButton
+                      size="small"
+                      onClick={() => { setOpenProject(null); setEditingLink(false) }}
+                      sx={{ position: 'absolute', top: 12, right: 12 }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </DialogTitle>
+                  <DialogContent dividers>
+                    <EditableText
+                      value={project.description}
+                      onChange={(v) => updateProject(openProject, 'description', v)}
+                      editMode={editMode}
+                      sx={{ color: 'text.secondary', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}
+                    />
+
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 3 }}>
+                      {editingLink ? (
+                        <TextField
+                          fullWidth
+                          size="small"
+                          autoFocus
+                          label="Project link"
+                          placeholder="https://github.com/you/project"
+                          value={project.link ?? ''}
+                          onChange={(e) => updateProject(openProject, 'link', e.target.value)}
+                          onBlur={() => !(project.link || '').trim() && setEditingLink(false)}
+                        />
+                      ) : href ? (
+                        <Button
+                          component="a"
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          size="small"
+                          endIcon={<OpenInNewIcon />}
+                          sx={{ textTransform: 'none', ml: -0.5 }}
+                        >
+                          Open project
+                        </Button>
+                      ) : null}
+                      {suggestFix && !editingLink && (
+                        <IconButton
+                          size="small"
+                          title={href ? 'Edit link' : 'Add a link'}
+                          onClick={() => setEditingLink(true)}
+                        >
+                          {href ? <EditIcon fontSize="small" /> : <LinkIcon fontSize="small" />}
+                        </IconButton>
+                      )}
+                    </Stack>
+
+                    <Box sx={{ mt: 2 }}>
+                      <SectionFix
+                        api={suggestFix}
+                        path={sectionPath.project(openProject)}
+                        text={project.description}
+                      />
+                    </Box>
+                  </DialogContent>
+                </>
+              )
+            })()}
+          </Dialog>
         </Box>
       )}
 
@@ -516,7 +711,8 @@ const Month = () => {
           )}
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          {data.skills.map((skill, i) => (
+          {/* Edit mode always shows everything - you can't edit a hidden skill. */}
+          {(editMode || showAllSkills ? data.skills : data.skills.slice(0, SKILLS_PREVIEW_COUNT)).map((skill, i) => (
             <Chip
               key={i}
               label={
@@ -526,6 +722,14 @@ const Month = () => {
               variant="outlined"
             />
           ))}
+          {!editMode && data.skills.length > SKILLS_PREVIEW_COUNT && (
+            <Chip
+              label={showAllSkills ? 'Show less' : `+${data.skills.length - SKILLS_PREVIEW_COUNT} more`}
+              onClick={() => setShowAllSkills(v => !v)}
+              variant="outlined"
+              sx={{ borderStyle: 'dashed', color: 'text.secondary', cursor: 'pointer' }}
+            />
+          )}
         </Stack>
       </Box>
       <Box component="section" sx={{ mb: 6 }}>
@@ -539,13 +743,49 @@ const Month = () => {
           
         </Stack>
 
-        {!contributions && !loading &&
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Button onClick={()=>{fetchFromGithub() }}>
-              Fetch From Github
-            </Button>
-          </Stack>
-        }
+        {!contributions && !loading && (
+          // Connecting and loading are the same empty slot from the user's
+          // point of view, so they share one panel: connect first if we have
+          // to, otherwise go straight to fetching.
+          <Box
+            onClick={() => (githubConnected ? fetchFromGithub() : onSyncGithub?.())}
+            sx={{
+              width: '100%',
+              py: 6,
+              px: 3,
+              border: '1px dashed',
+              borderColor: 'divider',
+              borderRadius: 2,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1.5,
+              cursor: 'pointer',
+              transition: 'border-color 0.2s, background 0.2s',
+              '&:hover': { borderColor: 'text.disabled', bgcolor: 'action.hover' },
+            }}
+          >
+            <Box sx={{ position: 'relative', display: 'flex' }}>
+              <img src={githubLogo} alt="GitHub" width="56" height="56" style={{ borderRadius: '50%' }} />
+              {githubConnected && (
+                <CheckCircleIcon
+                  sx={{
+                    position: 'absolute', bottom: -2, right: -2,
+                    color: 'success.main', bgcolor: 'background.paper',
+                    borderRadius: '50%', fontSize: 22,
+                  }}
+                />
+              )}
+            </Box>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              {githubConnected ? 'Load your contribution heatmap' : 'Connect GitHub to show your contributions'}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+              {githubConnected ? 'Last 24 weeks of commits' : 'Takes a few seconds'}
+            </Typography>
+          </Box>
+        )}
         {loading &&
           <HeatmapSkeleton></HeatmapSkeleton>
         }
@@ -740,8 +980,9 @@ function App() {
     isViewingOwnProfile ? (user?.uid || null) : null,
     template
   )
-  const [open, setOpen] = useState(false)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   // Suggest a Fix. The backend owns quota, prompts and the section write; this
   // hook owns loading state, the AbortController and the idempotency key.
@@ -792,6 +1033,14 @@ function App() {
   const theme = createTheme({
     palette: {
       mode: prefersDarkMode ? 'dark' : 'light',
+      // MUI's default primary is blue, which is the only colour on an
+      // otherwise monochrome site - and it drives button fills, text buttons,
+      // focus rings and click ripples alike. Making primary the foreground
+      // colour turns all of those white on dark (and near-black on light)
+      // in one place, rather than overriding each button.
+      primary: prefersDarkMode
+        ? { main: '#ffffff', contrastText: '#000000' }
+        : { main: '#111111', contrastText: '#ffffff' },
     },
     typography: {
       fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -966,18 +1215,12 @@ function App() {
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-          <CircularProgress />
-        </Box>
+        <Container maxWidth="md" sx={{ py: { xs: 4, md: 8 } }}>
+          <PortfolioSkeleton />
+        </Container>
       </ThemeProvider>
     )
   }
-  const handleClose = () => {
-    setOpen(false);
-  };
-  const handleOpen = () => {
-    setOpen(true);
-  };
   const handleConnectGithub = () => {
     window.location.href = `${BACKEND_URL}/auth/github/login?uid=${encodeURIComponent(user?.uid ?? '')}`;
   };
@@ -998,12 +1241,92 @@ function App() {
           {/* Left side - User info */}
           <Box>
           <Stack direction='row'>
-            <IconButton component={Link} to='/' size="small" sx={{ mr: 1 }}>
-              <Home />
+            <IconButton
+              size="small"
+              sx={{ mr: 1 }}
+              aria-label="Menu"
+              onClick={(e) => setMenuAnchor(e.currentTarget)}
+            >
+              <MenuIcon />
             </IconButton>
+            <Menu
+              anchorEl={menuAnchor}
+              open={Boolean(menuAnchor)}
+              onClose={() => setMenuAnchor(null)}
+              slotProps={{ paper: { sx: { bgcolor: 'background.default', backgroundImage: 'none', border: 1, borderColor: 'divider', minWidth: 190 } } }}
+            >
+              {user && isViewingOwnProfile && (
+                <Box sx={{ px: 2, py: 1.5, minWidth: 220 }}>
+                  <Typography variant="overline" sx={{ color: 'text.disabled', letterSpacing: '0.1em', display: 'block', lineHeight: 1.6 }}>
+                    Profile
+                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => { setMenuAnchor(null); setProfileOpen(true) }}
+                    sx={{ textTransform: 'none', p: 0, minWidth: 0, fontWeight: 600, justifyContent: 'flex-start' }}
+                  >
+                    {username}
+                  </Button>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={PLAN_LABELS[suggestFix.quota?.plan ?? 'free'] ?? suggestFix.quota?.plan}
+                      sx={{ borderColor: 'divider', color: 'text.primary' }}
+                    />
+                    {suggestFix.quota && (
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        {suggestFix.quota.remaining_credits}/{suggestFix.quota.daily_limit} credits left
+                      </Typography>
+                    )}
+                  </Stack>
+                  {suggestFix.quota && suggestFix.quota.plan !== 'pro' && (
+                    <Button
+                      size="small"
+                      onClick={() => { setMenuAnchor(null); setUpgradeOpen(true) }}
+                      sx={{ textTransform: 'none', mt: 0.5, ml: -0.5 }}
+                    >
+                      Upgrade plan
+                    </Button>
+                  )}
+                </Box>
+              )}
+              {user && isViewingOwnProfile && <Divider sx={{ my: 0.5 }} />}
+              <MenuItem component={Link} to="/" onClick={() => setMenuAnchor(null)}>
+                <ListItemIcon><Home fontSize="small" /></ListItemIcon>
+                <ListItemText>Home</ListItemText>
+              </MenuItem>
+              {user && isViewingOwnProfile && (
+                <MenuItem
+                  disabled={uploadingResume}
+                  onClick={() => { setMenuAnchor(null); resumeInputRef.current?.click() }}
+                >
+                  <ListItemIcon><PictureAsPdfIcon fontSize="small" /></ListItemIcon>
+                  <ListItemText>{uploadingResume ? 'Parsing…' : 'Upload resume'}</ListItemText>
+                </MenuItem>
+              )}
+              {isViewingOwnProfile && (
+                <MenuItem
+                  onClick={() => { setMenuAnchor(null); setView(view === 'portfolio' ? 'logs' : 'portfolio') }}
+                >
+                  <ListItemIcon><ArticleIcon fontSize="small" /></ListItemIcon>
+                  <ListItemText>{view === 'logs' ? 'Portfolio' : 'Logs'}</ListItemText>
+                </MenuItem>
+              )}
+            </Menu>
             {user ? (
               <Stack direction="row" spacing={1} alignItems="center">
-                <Avatar src={user.photoURL || undefined} sx={{ width: 32, height: 32 }} />
+                <Avatar
+                  src={portfolio.avatarUrl || user.photoURL || undefined}
+                  onClick={() => isViewingOwnProfile && setProfileOpen(true)}
+                  sx={{
+                    width: 32, height: 32,
+                    ...(isViewingOwnProfile && {
+                      cursor: 'pointer',
+                      '&:hover': { outline: '2px solid', outlineColor: 'divider' },
+                    }),
+                  }}
+                />
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                   {username}
                 </Typography>
@@ -1039,22 +1362,6 @@ function App() {
                 >
                   {editMode ? 'Exit' : 'Edit'}
                 </Button>
-                <Button
-                  variant={editMode ? 'contained' : 'outlined'}
-                  size="small"
-                  onClick={handleOpen}
-                  >
-                Sync
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<PictureAsPdfIcon />}
-                  onClick={() => resumeInputRef.current?.click()}
-                  disabled={uploadingResume}
-                >
-                  {uploadingResume ? 'Parsing…' : 'Upload Resume'}
-                </Button>
                 <input
                   type="file"
                   accept=".pdf"
@@ -1073,13 +1380,6 @@ function App() {
                   Sign in to Edit
                 </Button>
               )}
-              <Button
-                variant={view === 'logs' ? 'contained' : 'outlined'}
-                size="small"
-                onClick={() => setView(view === 'portfolio' ? 'logs' : 'portfolio')}
-              >
-                {view === 'logs' ? 'Portfolio' : 'Logs'}
-              </Button>
               {user && username && (
                 <Button
                   variant={isPublished ? 'contained' : 'outlined'}
@@ -1095,52 +1395,6 @@ function App() {
           )}
         </Stack>
 
-        <Dialog
-          open={open}
-          onClose={handleClose}
-          aria-labelledby="alert-dialog-title"
-          aria-describedby="alert-dialog-description"
-          role="alertdialog"
-        >
-          <DialogTitle id="alert-dialog-title">
-            {"Connect To Sync Platforms"}
-          </DialogTitle>
-          <DialogContent>
-            <DialogContentText id="alert-dialog-description">
-              Connect your platforms to get realtime updates in your portfolio Website
-              <Stack sx={{
-                alignContent:'center'
-              }}>
-                <Button onClick={handleConnectGithub}
-                sx={{
-                  maxWidth:100,
-                  ml:25
-                }}
-                disabled={githubConnected}>
-                  <img
-                    src={githubLogo}
-                    alt="GitHub"
-                    width="80"
-                    height="80"
-                  />
-                  {githubConnected && (
-                    <CheckCircleIcon
-                      sx={{
-                        position: "absolute",
-                        bottom: 0,
-                        right: 0,
-                        color: "success.main",
-                        backgroundColor: "white",
-                        borderRadius: "50%",
-                        fontSize: 28,
-                      }}
-                    />
-                  )}
-                </Button>
-              </Stack>
-            </DialogContentText>
-          </DialogContent>
-      </Dialog>
 
       <Dialog open={uploadingResume} PaperProps={{ sx: { backgroundColor: '#1a1a1a', color: '#ffffff' } }}>
         <DialogContent>
@@ -1166,6 +1420,8 @@ function App() {
         ) : view === 'portfolio' ? (
           <Portfolio
             suggestFix={suggestFix}
+            onSyncGithub={handleConnectGithub}
+            githubConnected={githubConnected}
             editMode={editMode}
             data={portfolio}
             updateField={updateField}
@@ -1193,6 +1449,21 @@ function App() {
           />
         ) : (
           <Logs editMode={editMode} logs={logs} onUpdate={updateLogs} />
+        )}
+
+        {user && (
+          <ProfileDialog
+            open={profileOpen}
+            onClose={() => setProfileOpen(false)}
+            uid={user.uid}
+            username={username}
+            email={user.email}
+            avatarUrl={portfolio.avatarUrl}
+            fallbackPhoto={user.photoURL}
+            quota={suggestFix.quota}
+            onAvatarChange={(url) => updatePortfolio({ ...portfolio, avatarUrl: url })}
+            onUpgrade={() => { setProfileOpen(false); setUpgradeOpen(true) }}
+          />
         )}
 
         <UpgradeDialog

@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// Profile pictures. Anyone can read them - they appear on published portfolios -
+// but only the owner can write their own object, and only a reasonably sized
+// image. Without the size and type checks, this path is an open file host.
+//
+// Deploy:  firebase deploy --only storage
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /avatars/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -6,8 +6,9 @@ import {
   analyzeSection,
   applySuggestion,
   getQuota,
+  reviewCollection,
 } from '../services/suggestionsApi'
-import type { QuotaStatus, Suggestion } from '../services/suggestionsApi'
+import type { CollectionReview, QuotaStatus, Suggestion } from '../services/suggestionsApi'
 
 export type SuggestFixState =
   | 'IDLE'
@@ -33,6 +34,7 @@ export function useSuggestFix({ documentId, enabled, uid, onApplied }: Options) 
   const [state, setState] = useState<SuggestFixState>('IDLE')
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null)
+  const [review, setReview] = useState<CollectionReview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [quota, setQuota] = useState<QuotaStatus | null>(null)
 
@@ -172,6 +174,51 @@ export function useSuggestFix({ documentId, enabled, uid, onApplied }: Options) 
     [documentId]
   )
 
+  /**
+   * Review a whole collection. Shares the state machine with analyze, so only
+   * one AI operation runs at a time and the credit count stays in one place.
+   */
+  const analyzeCollection = useCallback(
+    async (collection: string) => {
+      if (!enabled) return
+      if (state === 'ANALYZING' || state === 'APPLYING') return
+
+      controllerRef.current?.abort()
+      const controller = new AbortController()
+      controllerRef.current = controller
+
+      const target = `collection:${collection}`
+      pendingRef.current = { sectionId: target }
+      setActiveSectionId(target)
+      setSuggestion(null)
+      setReview(null)
+      setError(null)
+      setState('ANALYZING')
+
+      try {
+        const result = await reviewCollection(
+          documentId,
+          collection,
+          crypto.randomUUID(),
+          controller.signal
+        )
+        if (!isCurrent(controller)) return
+        setReview(result)
+        setState('ANALYZED')
+        setQuota({
+          plan: result.plan,
+          daily_limit: result.daily_limit,
+          used_today: result.daily_limit - result.remaining_credits,
+          remaining_credits: result.remaining_credits,
+        })
+      } catch (e) {
+        if (isAbort(e) || !isCurrent(controller)) return
+        handleFailure(e)
+      }
+    },
+    [documentId, enabled, state]
+  )
+
   const analyze = useCallback(
     (sectionId: string) => {
       if (!enabled) return
@@ -229,6 +276,7 @@ export function useSuggestFix({ documentId, enabled, uid, onApplied }: Options) 
     controllerRef.current = null
     pendingRef.current = null
     setSuggestion(null)
+    setReview(null)
     setActiveSectionId(null)
     setError(null)
     setState(quota && quota.remaining_credits === 0 ? 'QUOTA_REACHED' : 'IDLE')
@@ -238,6 +286,8 @@ export function useSuggestFix({ documentId, enabled, uid, onApplied }: Options) 
     state,
     activeSectionId,
     suggestion,
+    review,
+    analyzeCollection,
     error,
     quota,
     analyze,

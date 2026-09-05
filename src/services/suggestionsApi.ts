@@ -1,6 +1,6 @@
 import { auth } from '../firebase'
+import { BACKEND_URL } from '../config'
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
 
 export interface Suggestion {
   suggestion_id: string
@@ -9,6 +9,24 @@ export interface Suggestion {
   analysis: string
   suggested_tags: string[]
   tag_labels: Record<string, string>
+  remaining_credits: number
+  daily_limit: number
+  plan: string
+}
+
+export interface ReviewItem {
+  index: number
+  title: string
+  verdict: 'keep' | 'rewrite' | 'remove'
+  reason: string
+}
+
+export interface CollectionReview {
+  review_id: string
+  collection: string
+  analysis: string
+  items: ReviewItem[]
+  verdict_labels: Record<string, string>
   remaining_credits: number
   daily_limit: number
   plan: string
@@ -102,4 +120,22 @@ export function applySuggestion(suggestionId: string, tag: string, signal?: Abor
     `/api/v1/suggestions/${encodeURIComponent(suggestionId)}/apply`,
     { method: 'POST', body: JSON.stringify({ tag }), signal }
   )
+}
+
+/**
+ * Review a whole collection at once - which entries to keep, rewrite or drop.
+ * Costs one credit, same as an analysis. Advisory only: acting on it is manual.
+ */
+export function reviewCollection(
+  documentId: string,
+  collection: string,
+  idempotencyKey: string,
+  signal?: AbortSignal
+) {
+  return request<CollectionReview>('/api/v1/reviews', {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ document_id: documentId, collection }),
+    signal,
+  })
 }
