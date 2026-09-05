@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '../firebase'
+import { bumpSectionVersions, writeSectionPath } from '../utils/sectionPaths'
 import { sdeTemplate } from '../templates/softwareDev'
 import { bdaTemplate } from '../templates/bda'
 import { customTemplate } from '../templates/custom'
@@ -36,6 +37,13 @@ export interface UserData {
   portfolio: PortfolioData
   logs: LogEntry[]
   isPublished: boolean
+  /**
+   * Per-section content version, keyed by section path (`bio`,
+   * `experience.0.description`, ...). A missing entry means version 0.
+   * Suggest a Fix uses this to refuse suggestions generated against text the
+   * user has since edited.
+   */
+  sectionVersions?: Record<string, number>
 }
 
 const defaultPortfolio: PortfolioData = {
@@ -75,6 +83,7 @@ export function useUserData(userId: string | null, templateId?: string) {
   const [portfolio, setPortfolio] = useState<PortfolioData>(getDefaultPortfolio)
   const [logs, setLogs] = useState<LogEntry[]>(defaultLogs)
   const [isPublished, setIsPublished] = useState(false)
+  const [sectionVersions, setSectionVersions] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -102,6 +111,7 @@ export function useUserData(userId: string | null, templateId?: string) {
         setPortfolio(data.portfolio)
         setLogs(data.logs || defaultLogs)
         setIsPublished(data.isPublished || false)
+        setSectionVersions(data.sectionVersions || {})
       } else {
         // No saved data, use template defaults
         setPortfolio(getDefaultPortfolio())
@@ -111,7 +121,12 @@ export function useUserData(userId: string | null, templateId?: string) {
     loadData()
   }, [userId, collectionName])
 
-  const saveData = async (newPortfolio: PortfolioData, newLogs: LogEntry[], published?: boolean) => {
+  const saveData = async (
+    newPortfolio: PortfolioData,
+    newLogs: LogEntry[],
+    published?: boolean,
+    versions?: Record<string, number>
+  ) => {
     if (!userId) {
       // Save to localStorage with template key
       const storageKey = `portfolioData_${collectionName}`
@@ -121,18 +136,37 @@ export function useUserData(userId: string | null, templateId?: string) {
       return
     }
 
-    // Save to Firestore using template-specific collection
+    // Save to Firestore using template-specific collection.
+    // merge: true so a concurrent Suggest Fix write (which the backend makes
+    // directly) isn't clobbered by a stale full-document overwrite.
     await setDoc(doc(db, collectionName, userId), {
       portfolio: newPortfolio,
       logs: newLogs,
       isPublished: published ?? isPublished,
+      sectionVersions: versions ?? sectionVersions,
       updatedAt: new Date().toISOString()
-    })
+    }, { merge: true })
   }
 
   const updatePortfolio = async (newPortfolio: PortfolioData) => {
+    // Bump the version of every section whose text actually changed, so a
+    // suggestion generated before this edit can no longer overwrite it.
+    const versions = bumpSectionVersions(portfolio, newPortfolio, sectionVersions)
     setPortfolio(newPortfolio)
-    await saveData(newPortfolio, logs)
+    setSectionVersions(versions)
+    await saveData(newPortfolio, logs, undefined, versions)
+  }
+
+  /**
+   * Adopt a rewrite the backend has already committed.
+   *
+   * Deliberately does not write to Firestore: the Apply Fix transaction
+   * persisted both the content and the new version. Pulling them into local
+   * state is what stops the next autosave from reverting the change.
+   */
+  const applyAiFix = (sectionId: string, content: string, version: number) => {
+    setPortfolio(current => writeSectionPath(current, sectionId, content))
+    setSectionVersions(current => ({ ...current, [sectionId]: version }))
   }
 
   const updateLogs = async (newLogs: LogEntry[]) => {
@@ -150,7 +184,7 @@ export function useUserData(userId: string | null, templateId?: string) {
     await saveData(portfolio, logs, false)
   }
 
-  return { portfolio, logs, isPublished, loading, updatePortfolio, updateLogs, publish, unpublish }
+  return { portfolio, logs, isPublished, loading, updatePortfolio, updateLogs, publish, unpublish, sectionVersions, applyAiFix }
 }
 
 // Hook for viewing another user's public data (read-only)
