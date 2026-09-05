@@ -448,7 +448,7 @@ const Month = () => {
           )}
         </Stack>
         <Stack spacing={4}>
-          {data.experience.map((exp, i) => (
+          {(data.experience ?? []).map((exp, i) => (
             <Box key={i} sx={{ position: 'relative' }}>
               {editMode && (
                 <IconButton
@@ -511,7 +511,7 @@ const Month = () => {
       )}
 
       {/* Projects */}
-      {(data.projects.length > 0 || editMode) && (
+      {((data.projects?.length ?? 0) > 0 || editMode) && (
         <Box component="section" sx={{ mb: 6 }}>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
             <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: '0.1em' }}>
@@ -522,7 +522,7 @@ const Month = () => {
                 <AddIcon fontSize="small" />
               </IconButton>
             )}
-            {suggestFix && data.projects.length >= 2 && (
+            {suggestFix && (data.projects?.length ?? 0) >= 2 && (
               <SuggestFixButton
                 onClick={() => suggestFix.analyzeCollection('projects')}
                 analyzing={
@@ -548,7 +548,7 @@ const Month = () => {
           )}
 
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 3 }}>
-            {data.projects.map((project, i) => {
+            {(data.projects ?? []).map((project, i) => {
               return (
               <Paper key={i} variant="outlined" sx={{
                 p: 3,
@@ -730,7 +730,7 @@ const Month = () => {
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           {/* Edit mode always shows everything - you can't edit a hidden skill. */}
-          {(editMode || showAllSkills ? data.skills : data.skills.slice(0, SKILLS_PREVIEW_COUNT)).map((skill, i) => (
+          {(editMode || showAllSkills ? (data.skills ?? []) : (data.skills ?? []).slice(0, SKILLS_PREVIEW_COUNT)).map((skill, i) => (
             <Chip
               key={i}
               label={
@@ -740,7 +740,7 @@ const Month = () => {
               variant="outlined"
             />
           ))}
-          {!editMode && data.skills.length > SKILLS_PREVIEW_COUNT && (
+          {!editMode && (data.skills?.length ?? 0) > SKILLS_PREVIEW_COUNT && (
             <Chip
               label={showAllSkills ? 'Show less' : `+${data.skills.length - SKILLS_PREVIEW_COUNT} more`}
               onClick={() => setShowAllSkills(v => !v)}

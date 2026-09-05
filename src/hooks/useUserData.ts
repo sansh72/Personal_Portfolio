@@ -92,6 +92,33 @@ const defaultLogs: LogEntry[] = [
   { id: '1', date: new Date().toISOString().split('T')[0], content: "Started my portfolio. Feeling productive today." }
 ]
 
+/**
+ * Fill in anything a stored or parsed portfolio is missing.
+ *
+ * PortfolioData declares these arrays as required, but the data arrives from
+ * Gemini parsing a PDF and from documents written by older versions of the
+ * app - neither honours the type. One missing key used to crash the whole
+ * page on `data.experience.map(...)`.
+ */
+export function normalizePortfolio(input: Partial<PortfolioData> | null | undefined): PortfolioData {
+  const p = input ?? {}
+  return {
+    ...p,
+    name: p.name ?? '',
+    title: p.title ?? '',
+    bio: p.bio ?? '',
+    email: p.email ?? '',
+    github: p.github ?? '',
+    linkedin: p.linkedin ?? '',
+    experience: Array.isArray(p.experience) ? p.experience : [],
+    projects: Array.isArray(p.projects) ? p.projects : [],
+    skills: Array.isArray(p.skills) ? p.skills : [],
+    education: Array.isArray(p.education) ? p.education : undefined,
+    customSections: Array.isArray(p.customSections) ? p.customSections : undefined,
+    customLinks: Array.isArray(p.customLinks) ? p.customLinks : undefined,
+  }
+}
+
 // Hook for current user's data (editable)
 export function useUserData(userId: string | null, templateId?: string) {
   // Determine which collection to use based on template
@@ -131,7 +158,7 @@ export function useUserData(userId: string | null, templateId?: string) {
       const savedPortfolio = localStorage.getItem(storageKey)
       const savedLogs = localStorage.getItem(logsKey)
       if (savedPortfolio) {
-        setPortfolio(JSON.parse(savedPortfolio))
+        setPortfolio(normalizePortfolio(JSON.parse(savedPortfolio)))
       } else {
         setPortfolio(getDefaultPortfolio())
       }
@@ -142,10 +169,11 @@ export function useUserData(userId: string | null, templateId?: string) {
 
     // Load from Firestore using template-specific collection
     const loadData = async () => {
+      try {
       const userDataDoc = await getDoc(doc(db, collectionName, userId))
       if (userDataDoc.exists()) {
         const data = userDataDoc.data() as UserData
-        setPortfolio(data.portfolio)
+        setPortfolio(normalizePortfolio(data.portfolio))
         setLogs(data.logs || defaultLogs)
         setIsPublished(data.isPublished || false)
         setSectionVersions(data.sectionVersions || {})
@@ -154,7 +182,13 @@ export function useUserData(userId: string | null, templateId?: string) {
         // No saved data, use template defaults
         setPortfolio(getDefaultPortfolio())
       }
-      setLoadedKey(dataKey)
+      } catch (e) {
+        // Permission denied or offline. Fall through to the defaults rather
+        // than leaving the page stuck on a skeleton with nothing to explain it.
+        console.error('Could not load portfolio', e)
+      } finally {
+        setLoadedKey(dataKey)
+      }
     }
     loadData()
   }, [userId, collectionName, dataKey])
@@ -186,7 +220,9 @@ export function useUserData(userId: string | null, templateId?: string) {
     }, { merge: true })
   }
 
-  const updatePortfolio = async (newPortfolio: PortfolioData) => {
+  const updatePortfolio = async (incoming: PortfolioData) => {
+    // Also covers the parsed resume handed over through navigation state.
+    const newPortfolio = normalizePortfolio(incoming)
     // Bump the version of every section whose text actually changed, so a
     // suggestion generated before this edit can no longer overwrite it.
     const versions = bumpSectionVersions(portfolio, newPortfolio, sectionVersions)
@@ -269,7 +305,7 @@ export function usePublicProfile(username: string | null, templateId?:string) {
       if (portfolioDoc.exists()) {
         const data = portfolioDoc.data() as UserData
         if (data.isPublished) {
-          setPortfolio(data.portfolio)
+          setPortfolio(normalizePortfolio(data.portfolio))
           setGithubContributions(data.githubContributions || null)
           setLogs(data.logs || [])
           setLoading(false)
