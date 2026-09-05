@@ -71,5 +71,15 @@ service cloud.firestore {
     match /payment_events/{eventId} {
       allow read, write: if false;
     }
+
+    // GitHub OAuth tokens. Kept out of users/{uid} because that document is
+    // readable by every signed-in user, which made one user's token readable
+    // by all of them.
+    match /github_tokens/{uid} {
+      allow read, write: if false;
+    }
+    match /oauth_states/{state} {
+      allow read, write: if false;
+    }
   }
 }

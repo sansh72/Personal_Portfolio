@@ -56,6 +56,14 @@ import { PortfolioSkeleton } from './components/PortfolioSkeleton'
 import { ProfileDialog } from './components/ProfileDialog'
 
 import { BACKEND_URL } from './config'
+import { auth as firebaseAuth } from './firebase'
+
+/** These endpoints now identify the user by their token, not a ?uid= param. */
+async function authHeaders(): Promise<Record<string, string>> {
+  const current = firebaseAuth.currentUser
+  if (!current) return {}
+  return { Authorization: `Bearer ${await current.getIdToken()}` }
+}
   
 function EditableText({
   value,
@@ -329,7 +337,6 @@ function Portfolio({ suggestFix, onSyncGithub, githubConnected, savedContributio
     // The link field is opt-in: no link and nobody asking for one means no
     // empty input sitting there.
     const [editingLink, setEditingLink] = useState(false)
-    const { user} = useAuth()
     const [loading, setLoading] = useState(false)
     
     const [weeks, setWeeks] = useState<any[]>([])
@@ -338,7 +345,7 @@ function Portfolio({ suggestFix, onSyncGithub, githubConnected, savedContributio
     const fetchFromGithub:any = async () => {
     setLoading(true)
     console.log(loading)
-    const results = await fetch(`${BACKEND_URL}/github/contributions?uid=${encodeURIComponent(user?.uid ?? '')}`)
+    const results = await fetch(`${BACKEND_URL}/github/contributions`, { headers: await authHeaders() })
     const response = await results.json()
     setLoading(false)
     const calendar = response.data.viewer.contributionsCollection.contributionCalendar
@@ -1241,7 +1248,7 @@ function App() {
   const [githubConnected, setGithubConnected] = useState(false)
   const githubConnection = async () => {
     if (!user?.uid) return
-    const result = await fetch(`${BACKEND_URL}/github/status?uid=${encodeURIComponent(user?.uid ?? '')}`)
+    const result = await fetch(`${BACKEND_URL}/github/status`, { headers: await authHeaders() })
     const response = await result.json()
     setGithubConnected(response.connected === true)
   }
@@ -1259,8 +1266,22 @@ function App() {
       </ThemeProvider>
     )
   }
-  const handleConnectGithub = () => {
-    window.location.href = `${BACKEND_URL}/auth/github/login?uid=${encodeURIComponent(user?.uid ?? '')}`;
+  const handleConnectGithub = async () => {
+    // The backend derives the account from the token and hands back a URL
+    // whose state is bound to it - a uid in the query string let anyone start
+    // this flow against someone else's account.
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/github/start`, {
+        method: 'POST',
+        headers: await authHeaders(),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const { authorize_url } = await res.json()
+      window.location.href = authorize_url
+    } catch (e) {
+      console.error(e)
+      setSnackbar({ open: true, message: 'Could not start GitHub sign-in. Please try again.', severity: 'error' })
+    }
   };
 
   return (
