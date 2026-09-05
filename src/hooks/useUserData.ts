@@ -35,10 +35,32 @@ export interface LogEntry {
   content: string
 }
 
+export interface ContributionDay {
+  contributionCount: number
+  date: string
+  weekday: number
+  color: string
+}
+
+/**
+ * A snapshot of the GitHub heatmap, saved when the owner fetches it.
+ *
+ * Fetching live needs the owner's GitHub token, which a visitor obviously
+ * doesn't have - so without persisting this, a published portfolio showed
+ * visitors an empty "Connect GitHub" panel instead of the owner's history.
+ */
+export interface GithubContributions {
+  months: { contributionDays: ContributionDay[] }[]
+  totalContributions: number
+  username?: string
+  fetchedAt: string
+}
+
 export interface UserData {
   portfolio: PortfolioData
   logs: LogEntry[]
   isPublished: boolean
+  githubContributions?: GithubContributions
   /**
    * Per-section content version, keyed by section path (`bio`,
    * `experience.0.description`, ...). A missing entry means version 0.
@@ -86,6 +108,7 @@ export function useUserData(userId: string | null, templateId?: string) {
   const [logs, setLogs] = useState<LogEntry[]>(defaultLogs)
   const [isPublished, setIsPublished] = useState(false)
   const [sectionVersions, setSectionVersions] = useState<Record<string, number>>({})
+  const [githubContributions, setGithubContributions] = useState<GithubContributions | null>(null)
 
   /**
    * Which (user, template) pair the data in state actually belongs to.
@@ -126,6 +149,7 @@ export function useUserData(userId: string | null, templateId?: string) {
         setLogs(data.logs || defaultLogs)
         setIsPublished(data.isPublished || false)
         setSectionVersions(data.sectionVersions || {})
+        setGithubContributions(data.githubContributions || null)
       } else {
         // No saved data, use template defaults
         setPortfolio(getDefaultPortfolio())
@@ -172,6 +196,18 @@ export function useUserData(userId: string | null, templateId?: string) {
   }
 
   /**
+   * Persist the heatmap so visitors to the published portfolio can see it.
+   *
+   * Written on its own with merge rather than through saveData, so refreshing
+   * the heatmap never rewrites the portfolio text.
+   */
+  const saveGithubContributions = async (data: GithubContributions) => {
+    setGithubContributions(data)
+    if (!userId) return
+    await setDoc(doc(db, collectionName, userId), { githubContributions: data }, { merge: true })
+  }
+
+  /**
    * Adopt a rewrite the backend has already committed.
    *
    * Deliberately does not write to Firestore: the Apply Fix transaction
@@ -198,12 +234,13 @@ export function useUserData(userId: string | null, templateId?: string) {
     await saveData(portfolio, logs, false)
   }
 
-  return { portfolio, logs, isPublished, loading, updatePortfolio, updateLogs, publish, unpublish, sectionVersions, applyAiFix }
+  return { portfolio, logs, isPublished, loading, updatePortfolio, updateLogs, publish, unpublish, sectionVersions, applyAiFix, githubContributions, saveGithubContributions }
 }
 
 // Hook for viewing another user's public data (read-only)
 export function usePublicProfile(username: string | null, templateId?:string) {
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
+  const [githubContributions, setGithubContributions] = useState<GithubContributions | null>(null)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -233,6 +270,7 @@ export function usePublicProfile(username: string | null, templateId?:string) {
         const data = portfolioDoc.data() as UserData
         if (data.isPublished) {
           setPortfolio(data.portfolio)
+          setGithubContributions(data.githubContributions || null)
           setLogs(data.logs || [])
           setLoading(false)
           return
@@ -247,5 +285,5 @@ export function usePublicProfile(username: string | null, templateId?:string) {
     loadProfile()
   }, [username, templateId])
 
-  return { portfolio, logs, loading, notFound }
+  return { portfolio, logs, loading, notFound, githubContributions }
 }
