@@ -41,6 +41,9 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import { useAuth } from './contexts/AuthContext'
 import { useUserData, usePublicProfile } from './hooks/useUserData'
 import type { PortfolioData, LogEntry, CustomSection } from './hooks/useUserData'
+import { useSuggestFix } from './hooks/useSuggestFix'
+import { SuggestFixButton, SuggestionPanel, QuotaIndicator, UpgradeDialog } from './components/SuggestFix'
+import { MIN_SECTION_CHARS, sectionPath } from './utils/sectionPaths'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
   
@@ -224,7 +227,51 @@ function Logs({ editMode, logs, onUpdate }: {
   )
 }
 
-function Portfolio({ editMode, data, updateField, updateExperience, updateProject, updateSkill, addExperience, addProject, addSkill, removeExperience, removeProject, removeSkill, updateEducation, addEducation, removeEducation, updateCustomSection, addCustomSection, removeCustomSection, addCustomSectionItem, removeCustomSectionItem, updateCustomSectionItem, addCustomLink, removeCustomLink, updateCustomLink }: {
+type SuggestFixApi = ReturnType<typeof useSuggestFix> & { onUpgrade?: () => void }
+
+/**
+ * The Suggest Fix affordance for one section: the button, plus the analysis
+ * panel while this section is the active one.
+ */
+function SectionFix({ api, path, text }: {
+  api?: SuggestFixApi
+  path: string
+  text: string
+}) {
+  // Shown whenever this is your own portfolio, in or out of edit mode. The
+  // parent only passes `api` for your own profile, so public views get nothing.
+  if (!api) return null
+
+  const isActive = api.activeSectionId === path
+  const tooShort = (text ?? '').trim().length < MIN_SECTION_CHARS
+
+  return (
+    <Box sx={{ mt: 0.5 }}>
+      <SuggestFixButton
+        onClick={() => api.analyze(path)}
+        analyzing={isActive && api.state === 'ANALYZING'}
+        // Busy anywhere disables everywhere: one logical operation at a time.
+        disabled={api.isBusy || tooShort}
+      />
+      {isActive && (
+        <SuggestionPanel
+          key={api.suggestion?.suggestion_id ?? 'no-suggestion'}
+          state={api.state}
+          suggestion={api.suggestion}
+          error={api.error}
+          quota={api.quota}
+          onApply={api.apply}
+          onDismiss={api.dismiss}
+          onRetry={api.retry}
+          onUpgrade={api.onUpgrade}
+        />
+      )}
+    </Box>
+  )
+}
+
+function Portfolio({ suggestFix, editMode, data, updateField, updateExperience, updateProject, updateSkill, addExperience, addProject, addSkill, removeExperience, removeProject, removeSkill, updateEducation, addEducation, removeEducation, updateCustomSection, addCustomSection, removeCustomSection, addCustomSectionItem, removeCustomSectionItem, updateCustomSectionItem, addCustomLink, removeCustomLink, updateCustomLink }: {
+  suggestFix?: SuggestFixApi
   editMode: boolean
   data: PortfolioData
   updateField: <K extends keyof PortfolioData>(field: K, value: PortfolioData[K]) => void
@@ -319,6 +366,10 @@ const Month = () => {
         />
       </Box>
 
+      {suggestFix && (
+        <QuotaIndicator quota={suggestFix.quota} onUpgrade={suggestFix.onUpgrade} />
+      )}
+
       {/* About */}
       <Box component="section" sx={{ mb: 6 }}>
         <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: '0.1em', mb: 2, display: 'block' }}>
@@ -331,6 +382,7 @@ const Month = () => {
           variant="body1"
           sx={{ color: 'text.secondary', lineHeight: 1.7, fontSize: '1.1rem' }}
         />
+        <SectionFix api={suggestFix} path={sectionPath.bio()} text={data.bio} />
       </Box>
 
       {/* Experience */}
@@ -364,6 +416,7 @@ const Month = () => {
               </Stack>
               <EditableText value={exp.period} onChange={(v) => updateExperience(i, 'period', v)} editMode={editMode} variant="body2" sx={{ color: 'text.disabled', mb: 1 }} />
               <EditableText value={exp.description} onChange={(v) => updateExperience(i, 'description', v)} editMode={editMode} sx={{ color: 'text.secondary', lineHeight: 1.6 }} />
+              <SectionFix api={suggestFix} path={sectionPath.experience(i)} text={exp.description} />
             </Box>
           ))}
         </Stack>
@@ -401,6 +454,7 @@ const Month = () => {
                 </Stack>
                 <EditableText value={edu.period} onChange={(v) => updateEducation(i, 'period', v)} editMode={editMode} variant="body2" sx={{ color: 'text.disabled', mb: 1 }} />
                 <EditableText value={edu.description} onChange={(v) => updateEducation(i, 'description', v)} editMode={editMode} sx={{ color: 'text.secondary', lineHeight: 1.6 }} />
+                <SectionFix api={suggestFix} path={sectionPath.education(i)} text={edu.description} />
               </Box>
             ))}
           </Stack>
@@ -442,6 +496,7 @@ const Month = () => {
                 )}
                 <EditableText value={project.name} onChange={(v) => updateProject(i, 'name', v)} editMode={editMode} variant="h6" sx={{ fontWeight: 600, mb: 1 }} />
                 <EditableText value={project.description} onChange={(v) => updateProject(i, 'description', v)} editMode={editMode} sx={{ color: 'text.secondary', fontSize: '0.95rem' }} />
+                <SectionFix api={suggestFix} path={sectionPath.project(i)} text={project.description} />
               </Paper>
             ))}
           </Box>
@@ -681,11 +736,22 @@ function App() {
   const template = searchParams.get('template') || 'sde'
   const isViewingOwnProfile = !profileUsername || profileUsername === username
   const isViewingPublicProfile = profileUsername && profileUsername !== username
-  const { portfolio, logs, isPublished, loading: dataLoading, updatePortfolio, updateLogs, publish, unpublish } = useUserData(
+  const { portfolio, logs, isPublished, loading: dataLoading, updatePortfolio, updateLogs, publish, unpublish, applyAiFix } = useUserData(
     isViewingOwnProfile ? (user?.uid || null) : null,
     template
   )
   const [open, setOpen] = useState(false)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+
+  // Suggest a Fix. The backend owns quota, prompts and the section write; this
+  // hook owns loading state, the AbortController and the idempotency key.
+  const suggestFixState = useSuggestFix({
+    documentId: template,
+    enabled: Boolean(user) && isViewingOwnProfile,
+    uid: user?.uid ?? null,
+    onApplied: applyAiFix,
+  })
+  const suggestFix = { ...suggestFixState, onUpgrade: () => setUpgradeOpen(true) }
 
   useEffect(()=>{
     console.log('Called Once')
@@ -1099,6 +1165,7 @@ function App() {
           <PublicProfile username={profileUsername} />
         ) : view === 'portfolio' ? (
           <Portfolio
+            suggestFix={suggestFix}
             editMode={editMode}
             data={portfolio}
             updateField={updateField}
@@ -1127,6 +1194,17 @@ function App() {
         ) : (
           <Logs editMode={editMode} logs={logs} onUpdate={updateLogs} />
         )}
+
+        <UpgradeDialog
+          open={upgradeOpen}
+          onClose={() => setUpgradeOpen(false)}
+          currentPlan={suggestFix.quota?.plan ?? 'free'}
+          dailyLimit={suggestFix.quota?.daily_limit}
+          userEmail={user?.email}
+          // The webhook is what actually grants the plan, so re-read quota
+          // from the backend rather than assuming checkout succeeded.
+          onCheckoutStarted={() => suggestFix.refreshQuota()}
+        />
 
         {/* Snackbar for notifications */}
         <Snackbar

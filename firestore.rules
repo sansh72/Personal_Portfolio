@@ -1,0 +1,75 @@
+rules_version = '2';
+
+// Suggest a Fix depends on these rules. The backend uses the Admin SDK, which
+// bypasses rules entirely, so everything here is about what the *browser* may
+// do directly. Without the `plan` guard below a user could grant themselves Pro
+// from the devtools console and the daily quota would mean nothing.
+//
+// Deploy:  firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Fields only the backend may write. `plan` and `subscription_status` are
+    // set by the signed Razorpay webhook; the GitHub token is written during
+    // the OAuth callback.
+    function touchesProtectedFields() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny([
+          'plan',
+          'subscription_status',
+          'subscription_updated_at',
+          'pending_plan',
+          'razorpay_subscription_id',
+          'github_access_token'
+        ]);
+    }
+
+    match /users/{uid} {
+      // Public profiles are found by querying users for a username, so any
+      // signed-in user can read user docs.
+      // NOTE: these documents also hold `email` and `github_access_token`.
+      // Moving public lookups behind the backend and restricting this to
+      // `isOwner(uid)` would close that exposure.
+      allow read: if signedIn();
+      allow create: if isOwner(uid)
+                    && !request.resource.data.keys().hasAny(['plan', 'subscription_status']);
+      allow update: if isOwner(uid) && !touchesProtectedFields();
+      allow delete: if false;
+
+      // Daily Suggest a Fix counters. Readable so the UI can show remaining
+      // credits; writable only by the backend's atomic transaction.
+      match /usage/{date} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+    }
+
+    // Portfolio documents, one per template. `sectionVersions` is written by
+    // the client on edit and by the backend on Apply Fix.
+    match /{template}/{uid} {
+      allow read: if template in ['sde', 'bda', 'custom']
+                  && (isOwner(uid) || resource.data.isPublished == true);
+      allow write: if template in ['sde', 'bda', 'custom'] && isOwner(uid);
+    }
+
+    // Backend-only collections. The Admin SDK ignores these rules; browsers
+    // get nothing.
+    match /suggestions/{suggestionId} {
+      allow read, write: if false;
+    }
+    match /suggestion_requests/{key} {
+      allow read, write: if false;
+    }
+    match /payment_events/{eventId} {
+      allow read, write: if false;
+    }
+  }
+}
