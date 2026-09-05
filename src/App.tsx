@@ -48,7 +48,7 @@ import GoogleIcon from '@mui/icons-material/Google'
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import { useAuth } from './contexts/AuthContext'
 import { useUserData, usePublicProfile } from './hooks/useUserData'
-import type { PortfolioData, LogEntry, CustomSection } from './hooks/useUserData'
+import type { PortfolioData, LogEntry, CustomSection, GithubContributions } from './hooks/useUserData'
 import { useSuggestFix } from './hooks/useSuggestFix'
 import { SuggestFixButton, SuggestionPanel, QuotaIndicator, UpgradeDialog, CollectionReviewPanel } from './components/SuggestFix'
 import { MIN_SECTION_CHARS, sectionPath } from './utils/sectionPaths'
@@ -285,10 +285,14 @@ function SectionFix({ api, path, text }: {
   )
 }
 
-function Portfolio({ suggestFix, onSyncGithub, githubConnected, editMode, data, updateField, updateExperience, updateProject, updateSkill, addExperience, addProject, addSkill, removeExperience, removeProject, removeSkill, updateEducation, addEducation, removeEducation, updateCustomSection, addCustomSection, removeCustomSection, addCustomSectionItem, removeCustomSectionItem, updateCustomSectionItem, addCustomLink, removeCustomLink, updateCustomLink }: {
+function Portfolio({ suggestFix, onSyncGithub, githubConnected, savedContributions, onContributionsFetched, canFetchContributions = true, editMode, data, updateField, updateExperience, updateProject, updateSkill, addExperience, addProject, addSkill, removeExperience, removeProject, removeSkill, updateEducation, addEducation, removeEducation, updateCustomSection, addCustomSection, removeCustomSection, addCustomSectionItem, removeCustomSectionItem, updateCustomSectionItem, addCustomLink, removeCustomLink, updateCustomLink }: {
   suggestFix?: SuggestFixApi
   onSyncGithub?: () => void
   githubConnected?: boolean
+  savedContributions?: GithubContributions | null
+  onContributionsFetched?: (data: GithubContributions) => void
+  /** False on someone else's published portfolio: read the snapshot, never fetch. */
+  canFetchContributions?: boolean
   editMode: boolean
   data: PortfolioData
   updateField: <K extends keyof PortfolioData>(field: K, value: PortfolioData[K]) => void
@@ -315,7 +319,9 @@ function Portfolio({ suggestFix, onSyncGithub, githubConnected, editMode, data, 
   updateCustomLink: (index: number, field: 'label' | 'url', value: string) => void
 
 }) {
-    const [contributions, setContributions] = useState(false)
+    // Seeded from the saved snapshot, so a visitor sees the heatmap immediately
+    // without any GitHub call - they have no token to make one with.
+    const [contributions, setContributions] = useState(Boolean(savedContributions))
     const [showAllSkills, setShowAllSkills] = useState(false)
     // Cards are a fixed height, so the full text lives in a dialog rather than
     // being unreachable behind the fade.
@@ -327,18 +333,23 @@ function Portfolio({ suggestFix, onSyncGithub, githubConnected, editMode, data, 
     const [loading, setLoading] = useState(false)
     
     const [weeks, setWeeks] = useState<any[]>([])
-    const [month, setMonth] = useState<any[]>([])
+    const [month, setMonth] = useState<any[]>(savedContributions?.months ?? [])
 
     const fetchFromGithub:any = async () => {
     setLoading(true)
     console.log(loading)
     const results = await fetch(`${BACKEND_URL}/github/contributions?uid=${encodeURIComponent(user?.uid ?? '')}`)
     const response = await results.json()
-    console.log(response.data.viewer)
     setLoading(false)
-    setWeeks(response.data.viewer.contributionsCollection.contributionCalendar.weeks.slice(-24))
+    const calendar = response.data.viewer.contributionsCollection.contributionCalendar
+    setWeeks(calendar.weeks.slice(-24))
     setContributions(true)
+    fetchedTotalRef.current = calendar.totalContributions
   }
+
+  // Persisting happens once the weeks have been folded into months below,
+  // so the stored shape is exactly what the renderer consumes.
+  const fetchedTotalRef = useRef<number | null>(null)
 
 const Month = () => {
   if (!weeks.length) return []
@@ -365,10 +376,17 @@ const Month = () => {
 
   useEffect(()=>{
     // console.log('Inside here')
+    if (!weeks.length) return
     const value = Month()
-    console.log(value)
     setMonth(value)
-    
+    if (fetchedTotalRef.current !== null) {
+      onContributionsFetched?.({
+        months: value,
+        totalContributions: fetchedTotalRef.current,
+        fetchedAt: new Date().toISOString(),
+      })
+      fetchedTotalRef.current = null
+    }
   }, [weeks])
   return (
     <>
@@ -430,7 +448,7 @@ const Month = () => {
           )}
         </Stack>
         <Stack spacing={4}>
-          {data.experience.map((exp, i) => (
+          {(data.experience ?? []).map((exp, i) => (
             <Box key={i} sx={{ position: 'relative' }}>
               {editMode && (
                 <IconButton
@@ -493,7 +511,7 @@ const Month = () => {
       )}
 
       {/* Projects */}
-      {(data.projects.length > 0 || editMode) && (
+      {((data.projects?.length ?? 0) > 0 || editMode) && (
         <Box component="section" sx={{ mb: 6 }}>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
             <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: '0.1em' }}>
@@ -504,7 +522,7 @@ const Month = () => {
                 <AddIcon fontSize="small" />
               </IconButton>
             )}
-            {suggestFix && data.projects.length >= 2 && (
+            {suggestFix && (data.projects?.length ?? 0) >= 2 && (
               <SuggestFixButton
                 onClick={() => suggestFix.analyzeCollection('projects')}
                 analyzing={
@@ -530,7 +548,7 @@ const Month = () => {
           )}
 
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 3 }}>
-            {data.projects.map((project, i) => {
+            {(data.projects ?? []).map((project, i) => {
               return (
               <Paper key={i} variant="outlined" sx={{
                 p: 3,
@@ -712,7 +730,7 @@ const Month = () => {
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           {/* Edit mode always shows everything - you can't edit a hidden skill. */}
-          {(editMode || showAllSkills ? data.skills : data.skills.slice(0, SKILLS_PREVIEW_COUNT)).map((skill, i) => (
+          {(editMode || showAllSkills ? (data.skills ?? []) : (data.skills ?? []).slice(0, SKILLS_PREVIEW_COUNT)).map((skill, i) => (
             <Chip
               key={i}
               label={
@@ -722,7 +740,7 @@ const Month = () => {
               variant="outlined"
             />
           ))}
-          {!editMode && data.skills.length > SKILLS_PREVIEW_COUNT && (
+          {!editMode && (data.skills?.length ?? 0) > SKILLS_PREVIEW_COUNT && (
             <Chip
               label={showAllSkills ? 'Show less' : `+${data.skills.length - SKILLS_PREVIEW_COUNT} more`}
               onClick={() => setShowAllSkills(v => !v)}
@@ -740,10 +758,26 @@ const Month = () => {
               contributions && <Typography variant="overline" sx={{ color: '#ffffff', letterSpacing: '0.1em' }}> (Last 24 Weeks)</Typography>
             }
           </Typography>
-          
+          {/* Without this the snapshot could never be refreshed: once one
+              exists the fetch panel below is gone for good. */}
+          {contributions && canFetchContributions && githubConnected && (
+            <Button
+              size="small"
+              disabled={loading}
+              onClick={() => fetchFromGithub()}
+              sx={{ textTransform: 'none', color: 'text.disabled', minWidth: 0 }}
+            >
+              {loading ? 'Refreshing…' : 'Refresh'}
+            </Button>
+          )}
+          {savedContributions?.fetchedAt && contributions && (
+            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+              updated {new Date(savedContributions.fetchedAt).toLocaleDateString()}
+            </Typography>
+          )}
         </Stack>
 
-        {!contributions && !loading && (
+        {!contributions && !loading && canFetchContributions && (
           // Connecting and loading are the same empty slot from the user's
           // point of view, so they share one panel: connect first if we have
           // to, otherwise go straight to fetching.
@@ -897,7 +931,7 @@ const Month = () => {
 function PublicProfile({ username }: { username: string }) {
   const searchParams = new URLSearchParams(window.location.search)
   const templateId = searchParams.get('template') || undefined
-  const { portfolio, logs, loading, notFound } = usePublicProfile(username, templateId)
+  const { portfolio, logs, loading, notFound, githubContributions } = usePublicProfile(username, templateId)
   const [view, setView] = useState<'portfolio' | 'logs'>('portfolio')
 
   if (loading) {
@@ -936,6 +970,10 @@ function PublicProfile({ username }: { username: string }) {
       {view === 'portfolio' ? (
         <Portfolio
           editMode={false}
+          savedContributions={githubContributions}
+          // A visitor has no GitHub token, so there is nothing for them to
+          // fetch or connect - they see the saved snapshot or nothing at all.
+          canFetchContributions={false}
           data={portfolio}
           updateField={noopUpdate}
           updateExperience={noopUpdate}
@@ -976,7 +1014,7 @@ function App() {
   const template = searchParams.get('template') || 'sde'
   const isViewingOwnProfile = !profileUsername || profileUsername === username
   const isViewingPublicProfile = profileUsername && profileUsername !== username
-  const { portfolio, logs, isPublished, loading: dataLoading, updatePortfolio, updateLogs, publish, unpublish, applyAiFix } = useUserData(
+  const { portfolio, logs, isPublished, loading: dataLoading, updatePortfolio, updateLogs, publish, unpublish, applyAiFix, githubContributions, saveGithubContributions } = useUserData(
     isViewingOwnProfile ? (user?.uid || null) : null,
     template
   )
@@ -1422,6 +1460,8 @@ function App() {
             suggestFix={suggestFix}
             onSyncGithub={handleConnectGithub}
             githubConnected={githubConnected}
+            savedContributions={githubContributions}
+            onContributionsFetched={saveGithubContributions}
             editMode={editMode}
             data={portfolio}
             updateField={updateField}

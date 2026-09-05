@@ -9,7 +9,8 @@ interface AuthContextType {
   user: User | null
   username: string | null
   loading: boolean
-  signInWithGoogle: () => Promise<void>
+  /** Resolves with the signed-in user so callers can continue immediately. */
+  signInWithGoogle: () => Promise<User>
   logout: () => Promise<void>
 }
 
@@ -55,7 +56,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signInWithGoogle = async () => {
-    await signInWithPopup(auth, googleProvider)
+    const credential = await signInWithPopup(auth, googleProvider)
+    // Returned rather than read from context: `user` state has not updated yet
+    // in the caller's closure at this point.
+    return credential.user
   }
 
   const logout = async () => {

@@ -35,10 +35,32 @@ export interface LogEntry {
   content: string
 }
 
+export interface ContributionDay {
+  contributionCount: number
+  date: string
+  weekday: number
+  color: string
+}
+
+/**
+ * A snapshot of the GitHub heatmap, saved when the owner fetches it.
+ *
+ * Fetching live needs the owner's GitHub token, which a visitor obviously
+ * doesn't have - so without persisting this, a published portfolio showed
+ * visitors an empty "Connect GitHub" panel instead of the owner's history.
+ */
+export interface GithubContributions {
+  months: { contributionDays: ContributionDay[] }[]
+  totalContributions: number
+  username?: string
+  fetchedAt: string
+}
+
 export interface UserData {
   portfolio: PortfolioData
   logs: LogEntry[]
   isPublished: boolean
+  githubContributions?: GithubContributions
   /**
    * Per-section content version, keyed by section path (`bio`,
    * `experience.0.description`, ...). A missing entry means version 0.
@@ -70,6 +92,33 @@ const defaultLogs: LogEntry[] = [
   { id: '1', date: new Date().toISOString().split('T')[0], content: "Started my portfolio. Feeling productive today." }
 ]
 
+/**
+ * Fill in anything a stored or parsed portfolio is missing.
+ *
+ * PortfolioData declares these arrays as required, but the data arrives from
+ * Gemini parsing a PDF and from documents written by older versions of the
+ * app - neither honours the type. One missing key used to crash the whole
+ * page on `data.experience.map(...)`.
+ */
+export function normalizePortfolio(input: Partial<PortfolioData> | null | undefined): PortfolioData {
+  const p = input ?? {}
+  return {
+    ...p,
+    name: p.name ?? '',
+    title: p.title ?? '',
+    bio: p.bio ?? '',
+    email: p.email ?? '',
+    github: p.github ?? '',
+    linkedin: p.linkedin ?? '',
+    experience: Array.isArray(p.experience) ? p.experience : [],
+    projects: Array.isArray(p.projects) ? p.projects : [],
+    skills: Array.isArray(p.skills) ? p.skills : [],
+    education: Array.isArray(p.education) ? p.education : undefined,
+    customSections: Array.isArray(p.customSections) ? p.customSections : undefined,
+    customLinks: Array.isArray(p.customLinks) ? p.customLinks : undefined,
+  }
+}
+
 // Hook for current user's data (editable)
 export function useUserData(userId: string | null, templateId?: string) {
   // Determine which collection to use based on template
@@ -86,6 +135,7 @@ export function useUserData(userId: string | null, templateId?: string) {
   const [logs, setLogs] = useState<LogEntry[]>(defaultLogs)
   const [isPublished, setIsPublished] = useState(false)
   const [sectionVersions, setSectionVersions] = useState<Record<string, number>>({})
+  const [githubContributions, setGithubContributions] = useState<GithubContributions | null>(null)
 
   /**
    * Which (user, template) pair the data in state actually belongs to.
@@ -108,7 +158,7 @@ export function useUserData(userId: string | null, templateId?: string) {
       const savedPortfolio = localStorage.getItem(storageKey)
       const savedLogs = localStorage.getItem(logsKey)
       if (savedPortfolio) {
-        setPortfolio(JSON.parse(savedPortfolio))
+        setPortfolio(normalizePortfolio(JSON.parse(savedPortfolio)))
       } else {
         setPortfolio(getDefaultPortfolio())
       }
@@ -119,18 +169,26 @@ export function useUserData(userId: string | null, templateId?: string) {
 
     // Load from Firestore using template-specific collection
     const loadData = async () => {
+      try {
       const userDataDoc = await getDoc(doc(db, collectionName, userId))
       if (userDataDoc.exists()) {
         const data = userDataDoc.data() as UserData
-        setPortfolio(data.portfolio)
+        setPortfolio(normalizePortfolio(data.portfolio))
         setLogs(data.logs || defaultLogs)
         setIsPublished(data.isPublished || false)
         setSectionVersions(data.sectionVersions || {})
+        setGithubContributions(data.githubContributions || null)
       } else {
         // No saved data, use template defaults
         setPortfolio(getDefaultPortfolio())
       }
-      setLoadedKey(dataKey)
+      } catch (e) {
+        // Permission denied or offline. Fall through to the defaults rather
+        // than leaving the page stuck on a skeleton with nothing to explain it.
+        console.error('Could not load portfolio', e)
+      } finally {
+        setLoadedKey(dataKey)
+      }
     }
     loadData()
   }, [userId, collectionName, dataKey])
@@ -162,13 +220,27 @@ export function useUserData(userId: string | null, templateId?: string) {
     }, { merge: true })
   }
 
-  const updatePortfolio = async (newPortfolio: PortfolioData) => {
+  const updatePortfolio = async (incoming: PortfolioData) => {
+    // Also covers the parsed resume handed over through navigation state.
+    const newPortfolio = normalizePortfolio(incoming)
     // Bump the version of every section whose text actually changed, so a
     // suggestion generated before this edit can no longer overwrite it.
     const versions = bumpSectionVersions(portfolio, newPortfolio, sectionVersions)
     setPortfolio(newPortfolio)
     setSectionVersions(versions)
     await saveData(newPortfolio, logs, undefined, versions)
+  }
+
+  /**
+   * Persist the heatmap so visitors to the published portfolio can see it.
+   *
+   * Written on its own with merge rather than through saveData, so refreshing
+   * the heatmap never rewrites the portfolio text.
+   */
+  const saveGithubContributions = async (data: GithubContributions) => {
+    setGithubContributions(data)
+    if (!userId) return
+    await setDoc(doc(db, collectionName, userId), { githubContributions: data }, { merge: true })
   }
 
   /**
@@ -198,12 +270,13 @@ export function useUserData(userId: string | null, templateId?: string) {
     await saveData(portfolio, logs, false)
   }
 
-  return { portfolio, logs, isPublished, loading, updatePortfolio, updateLogs, publish, unpublish, sectionVersions, applyAiFix }
+  return { portfolio, logs, isPublished, loading, updatePortfolio, updateLogs, publish, unpublish, sectionVersions, applyAiFix, githubContributions, saveGithubContributions }
 }
 
 // Hook for viewing another user's public data (read-only)
 export function usePublicProfile(username: string | null, templateId?:string) {
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null)
+  const [githubContributions, setGithubContributions] = useState<GithubContributions | null>(null)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -232,7 +305,8 @@ export function usePublicProfile(username: string | null, templateId?:string) {
       if (portfolioDoc.exists()) {
         const data = portfolioDoc.data() as UserData
         if (data.isPublished) {
-          setPortfolio(data.portfolio)
+          setPortfolio(normalizePortfolio(data.portfolio))
+          setGithubContributions(data.githubContributions || null)
           setLogs(data.logs || [])
           setLoading(false)
           return
@@ -247,5 +321,5 @@ export function usePublicProfile(username: string | null, templateId?:string) {
     loadProfile()
   }, [username, templateId])
 
-  return { portfolio, logs, loading, notFound }
+  return { portfolio, logs, loading, notFound, githubContributions }
 }
