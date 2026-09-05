@@ -14,6 +14,24 @@ declare global {
 
 const PLAN_NAMES: Record<string, string> = { free: 'Free', basic: 'Basic', pro: 'Pro' }
 
+/**
+ * The rest of the site is near-black with thin outlined borders and no colour.
+ * MUI's Dialog defaults fight that: an elevation overlay turns the surface
+ * grey, and Button defaults to primary blue. Both are overridden here rather
+ * than in the global theme, which would change every other surface too.
+ */
+const DIALOG_PAPER = {
+  sx: {
+    bgcolor: 'background.default',
+    backgroundImage: 'none',
+    border: 1,
+    borderColor: 'divider',
+    borderRadius: 2,
+  },
+}
+
+const CTA_SX = { textTransform: 'none' as const }
+
 /** How long to wait for the webhook before telling the user to check back. */
 const CONFIRM_TIMEOUT_MS = 40_000
 
@@ -111,7 +129,7 @@ export function UpgradeDialog({
   // --- after payment: confirming / confirmed / webhook running late ---
   if (awaitingPlan !== null) {
     return (
-      <Dialog open={open} onClose={confirmed || timedOut ? onClose : undefined} maxWidth="xs" fullWidth>
+      <Dialog open={open} onClose={confirmed || timedOut ? onClose : undefined} maxWidth="xs" fullWidth slotProps={{ paper: DIALOG_PAPER }}>
         <DialogTitle sx={{ fontWeight: 600 }}>
           {confirmed ? `You’re on ${PLAN_NAMES[awaitingPlan] ?? awaitingPlan}` : 'Payment received'}
         </DialogTitle>
@@ -157,7 +175,7 @@ export function UpgradeDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth slotProps={{ paper: DIALOG_PAPER }}>
       <DialogTitle sx={{ fontWeight: 600 }}>More AI credits</DialogTitle>
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -182,7 +200,14 @@ export function UpgradeDialog({
                         <Typography sx={{ fontWeight: 600 }}>
                           {PLAN_NAMES[option.plan] ?? option.plan}
                         </Typography>
-                        {isCurrent && <Chip size="small" label="Current" />}
+                        {isCurrent && (
+                          <Chip
+                            size="small"
+                            label="Current"
+                            variant="outlined"
+                            sx={{ borderColor: 'divider', color: 'text.disabled' }}
+                          />
+                        )}
                       </Stack>
                       <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                         {option.daily_credits} AI suggestions per day
@@ -198,7 +223,7 @@ export function UpgradeDialog({
                           variant="contained"
                           disabled={busyPlan !== null}
                           onClick={() => startCheckout(option.plan)}
-                          sx={{ textTransform: 'none' }}
+                          sx={CTA_SX}
                         >
                           {busyPlan === option.plan ? 'Opening…' : 'Choose'}
                         </Button>

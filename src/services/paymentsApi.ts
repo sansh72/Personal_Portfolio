@@ -1,7 +1,7 @@
 import { auth } from '../firebase'
+import { BACKEND_URL } from '../config'
 import { ApiError } from './suggestionsApi'
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
 
 export interface PlanOption {
   plan: string
