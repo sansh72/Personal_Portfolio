@@ -102,7 +102,7 @@ const defaultLogs: LogEntry[] = [
  */
 export function normalizePortfolio(input: Partial<PortfolioData> | null | undefined): PortfolioData {
   const p = input ?? {}
-  return {
+  const normalized: PortfolioData = {
     ...p,
     name: p.name ?? '',
     title: p.title ?? '',
@@ -113,10 +113,20 @@ export function normalizePortfolio(input: Partial<PortfolioData> | null | undefi
     experience: Array.isArray(p.experience) ? p.experience : [],
     projects: Array.isArray(p.projects) ? p.projects : [],
     skills: Array.isArray(p.skills) ? p.skills : [],
-    education: Array.isArray(p.education) ? p.education : undefined,
-    customSections: Array.isArray(p.customSections) ? p.customSections : undefined,
-    customLinks: Array.isArray(p.customLinks) ? p.customLinks : undefined,
   }
+
+  // Optional fields are deleted rather than set to undefined: Firestore
+  // rejects an undefined value outright, and setting these unconditionally
+  // broke every save, publish included.
+  for (const key of ['education', 'customSections', 'customLinks'] as const) {
+    if (Array.isArray(p[key])) {
+      normalized[key] = p[key] as never
+    } else {
+      delete normalized[key]
+    }
+  }
+
+  return normalized
 }
 
 // Hook for current user's data (editable)

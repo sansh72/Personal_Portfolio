@@ -1232,7 +1232,8 @@ function App() {
       await navigator.clipboard.writeText(url)
       setSnackbar({ open: true, message: `Published! Link copied: ${url}`, severity: 'success' })
       navigate(`/${username}?template=${template}`)
-    } catch {
+    } catch (e) {
+      console.error('Publish failed', e)
       setSnackbar({ open: true, message: 'Failed to publish', severity: 'error' })
     }
   }
@@ -1241,7 +1242,8 @@ function App() {
     try {
       await unpublish()
       setSnackbar({ open: true, message: 'Profile unpublished', severity: 'success' })
-    } catch {
+    } catch (e) {
+      console.error('Unpublish failed', e)
       setSnackbar({ open: true, message: 'Failed to unpublish', severity: 'error' })
     }
   }
