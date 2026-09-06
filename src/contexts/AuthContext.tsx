@@ -45,6 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             photoURL: user.photoURL,
             createdAt: new Date().toISOString()
           })
+          // Public index so signed-out visitors can resolve /username to this
+          // account without the users collection being readable.
+          try {
+            await setDoc(doc(db, 'usernames', generatedUsername), { uid: user.uid })
+          } catch (e) {
+            // Already taken, or rules refused it. The portfolio still works;
+            // only the public link would fail to resolve.
+            console.error('Could not claim username index', e)
+          }
           setUsername(generatedUsername)
         }
       } else {

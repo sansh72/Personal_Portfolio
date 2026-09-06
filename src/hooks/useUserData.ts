@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { bumpSectionVersions, writeSectionPath } from '../utils/sectionPaths'
 import { sdeTemplate } from '../templates/softwareDev'
@@ -298,34 +298,39 @@ export function usePublicProfile(username: string | null, templateId?:string) {
     }
 
     const loadProfile = async () => {
-      // Find user by username
-      const usersQuery = query(collection(db, 'users'), where('username', '==', username))
-      const usersSnapshot = await getDocs(usersQuery)
+      try {
+        // Resolve through the public username index. Querying the users
+        // collection needed read access to documents holding email addresses,
+        // which a signed-out visitor rightly does not get - and that denial
+        // used to hang this page on a loader forever.
+        const indexDoc = await getDoc(doc(db, 'usernames', username))
+        const userId = indexDoc.exists() ? (indexDoc.data().uid as string) : null
 
-      if (usersSnapshot.empty) {
-        setNotFound(true)
-        setLoading(false)
-        return
-      }
-
-      const userId = usersSnapshot.docs[0].id
-
-      const collectionName = templateId === 'bda' ? 'bda' : templateId === 'custom' ? 'custom' : 'sde'
-      const portfolioDoc = await getDoc(doc(db, collectionName, userId))
-      if (portfolioDoc.exists()) {
-        const data = portfolioDoc.data() as UserData
-        if (data.isPublished) {
-          setPortfolio(normalizePortfolio(data.portfolio))
-          setGithubContributions(data.githubContributions || null)
-          setLogs(data.logs || [])
-          setLoading(false)
+        if (!userId) {
+          setNotFound(true)
           return
         }
-      }
 
-      // No published portfolio found
-      setNotFound(true)
-      setLoading(false)
+        const collectionName = templateId === 'bda' ? 'bda' : templateId === 'custom' ? 'custom' : 'sde'
+        const portfolioDoc = await getDoc(doc(db, collectionName, userId))
+        if (portfolioDoc.exists()) {
+          const data = portfolioDoc.data() as UserData
+          if (data.isPublished) {
+            setPortfolio(normalizePortfolio(data.portfolio))
+            setGithubContributions(data.githubContributions || null)
+            setLogs(data.logs || [])
+            return
+          }
+        }
+
+        setNotFound(true)
+      } catch (e) {
+        console.error('Could not load public profile', e)
+        setNotFound(true)
+      } finally {
+        // Always: a thrown read used to leave the page spinning with no error.
+        setLoading(false)
+      }
     }
 
     loadProfile()
