@@ -32,13 +32,21 @@ service cloud.firestore {
         ]);
     }
 
+    // Public username -> uid index. Exists so a signed-out visitor can resolve
+    // /someone to a portfolio without the users collection being readable:
+    // those documents hold email addresses. Holds nothing but a uid.
+    match /usernames/{username} {
+      allow read: if true;
+      // Create only. A create fails if the document already exists, so a
+      // username cannot be taken over, and the uid must be the caller's own.
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
     match /users/{uid} {
-      // Public profiles are found by querying users for a username, so any
-      // signed-in user can read user docs.
-      // NOTE: these documents also hold `email` and `github_access_token`.
-      // Moving public lookups behind the backend and restricting this to
-      // `isOwner(uid)` would close that exposure.
-      allow read: if signedIn();
+      // Nobody reads anyone else's user document. Public lookups go through
+      // the usernames index above.
+      allow read: if isOwner(uid);
       allow create: if isOwner(uid)
                     && !request.resource.data.keys().hasAny(['plan', 'subscription_status']);
       allow update: if isOwner(uid) && !touchesProtectedFields();
