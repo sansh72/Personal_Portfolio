@@ -1,5 +1,7 @@
-import { Alert, Box, Button, IconButton, Paper, Stack, Typography } from '@mui/material'
+import { useEffect, useState } from 'react'
+import { Alert, Box, Button, Collapse, Fade, IconButton, Paper, Stack, Typography, useMediaQuery } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
+import { useTypewriter } from '../../hooks/useTypewriter'
 import type { SuggestFixState } from '../../hooks/useSuggestFix'
 import type { CollectionReview, QuotaStatus } from '../../services/suggestionsApi'
 
@@ -73,6 +75,26 @@ export function CollectionReviewPanel({
 
   if (!review || state !== 'ANALYZED') return null
 
+  return <ReviewBody review={review} onDismiss={onDismiss} />
+}
+
+/**
+ * Split out so the reveal state resets per review: this only mounts once a
+ * review exists, and remounts when a new one replaces it.
+ */
+function ReviewBody({ review, onDismiss }: { review: CollectionReview; onDismiss: () => void }) {
+  const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+  const { shown, done } = useTypewriter(review.analysis, { instant: reduceMotion })
+  const [showItems, setShowItems] = useState(reduceMotion)
+
+  // The verdicts land after the summary finishes, so the two are read in
+  // order rather than competing for attention.
+  useEffect(() => {
+    if (!done || showItems) return
+    const t = setTimeout(() => setShowItems(true), 250)
+    return () => clearTimeout(t)
+  }, [done, showItems])
+
   return (
     <Paper variant="outlined" sx={{ p: 2, mt: 1.5, mb: 2, borderRadius: 2 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
@@ -83,9 +105,22 @@ export function CollectionReviewPanel({
       </Stack>
 
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2, lineHeight: 1.6 }}>
-        {review.analysis}
+        {shown}
+        {!done && (
+          <Box
+            component="span"
+            sx={{
+              display: 'inline-block', width: '0.5em', height: '1em', ml: '2px',
+              verticalAlign: 'text-bottom', bgcolor: 'text.disabled',
+              animation: 'sfCaret 1s steps(2) infinite',
+              '@keyframes sfCaret': { '50%': { opacity: 0 } },
+            }}
+          />
+        )}
       </Typography>
 
+      <Collapse in={showItems} timeout={300}>
+      <Fade in={showItems} timeout={450}>
       <Stack spacing={1.25}>
         {review.items.map((item) => {
           const style = VERDICT_STYLE[item.verdict] ?? VERDICT_STYLE.keep
@@ -120,10 +155,14 @@ export function CollectionReviewPanel({
           )
         })}
       </Stack>
+      </Fade>
+      </Collapse>
 
-      <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block', mt: 2 }}>
-        Advice only — nothing is changed for you. Open a project to rewrite it.
-      </Typography>
+      <Collapse in={showItems} timeout={300}>
+        <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block', mt: 2 }}>
+          Advice only — nothing is changed for you. Open a project to rewrite it.
+        </Typography>
+      </Collapse>
     </Paper>
   )
 }

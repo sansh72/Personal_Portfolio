@@ -5,6 +5,7 @@ import { Home } from '@mui/icons-material'
 import MenuIcon from '@mui/icons-material/Menu'
 import ArticleIcon from '@mui/icons-material/Article'
 import DownloadIcon from '@mui/icons-material/Download'
+import PictureAsPdfIcon2 from '@mui/icons-material/PictureAsPdf'
 import OpenInNewIcon2 from '@mui/icons-material/Launch'
 import LinkIcon from '@mui/icons-material/Link'
 import EditIcon from '@mui/icons-material/Edit'
@@ -56,6 +57,7 @@ import { SuggestFixButton, SuggestionPanel, QuotaIndicator, UpgradeDialog, Colle
 import { MIN_SECTION_CHARS, sectionPath } from './utils/sectionPaths'
 import { PortfolioSkeleton } from './components/PortfolioSkeleton'
 import { downloadResumeLatex, openInOverleaf } from './utils/resumeLatex'
+import { downloadResumePdf } from './utils/resumePdf'
 import { ProfileDialog } from './components/ProfileDialog'
 
 import { BACKEND_URL } from './config'
@@ -1384,6 +1386,14 @@ function App() {
                 </MenuItem>
               )}
               {isViewingOwnProfile && <Divider sx={{ my: 0.5 }} />}
+              {isViewingOwnProfile && (
+                <MenuItem
+                  onClick={() => { setMenuAnchor(null); downloadResumePdf(portfolio) }}
+                >
+                  <ListItemIcon><PictureAsPdfIcon2 fontSize="small" /></ListItemIcon>
+                  <ListItemText>Download PDF</ListItemText>
+                </MenuItem>
+              )}
               {isViewingOwnProfile && (
                 <MenuItem
                   onClick={() => { setMenuAnchor(null); openInOverleaf(portfolio) }}

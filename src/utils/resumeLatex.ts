@@ -80,7 +80,7 @@ ${tex(e.description)}
 % Upload this file to Overleaf (New Project -> Upload Project) and compile.
 \\documentclass[11pt,a4paper]{article}
 
-\\usepackage[margin=0.75in]{geometry}
+\\usepackage[left=0.7in, right=0.7in, top=1cm, bottom=1cm]{geometry}
 \\usepackage[hidelinks]{hyperref}
 \\usepackage{enumitem}
 \\usepackage{titlesec}
@@ -90,6 +90,8 @@ ${tex(e.description)}
 \\titlespacing{\\section}{0pt}{10pt}{6pt}
 \\setlength{\\parindent}{0pt}
 \\pagestyle{empty}
+\\setlength{\\headsep}{0pt}
+\\setlength{\\topskip}{0pt}
 
 % role / organisation / dates on one line
 \\newcommand{\\entry}[3]{%
