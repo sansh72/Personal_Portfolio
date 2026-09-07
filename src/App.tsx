@@ -4,6 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Home } from '@mui/icons-material'
 import MenuIcon from '@mui/icons-material/Menu'
 import ArticleIcon from '@mui/icons-material/Article'
+import DownloadIcon from '@mui/icons-material/Download'
+import OpenInNewIcon2 from '@mui/icons-material/Launch'
 import LinkIcon from '@mui/icons-material/Link'
 import EditIcon from '@mui/icons-material/Edit'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
@@ -53,6 +55,7 @@ import { useSuggestFix } from './hooks/useSuggestFix'
 import { SuggestFixButton, SuggestionPanel, QuotaIndicator, UpgradeDialog, CollectionReviewPanel } from './components/SuggestFix'
 import { MIN_SECTION_CHARS, sectionPath } from './utils/sectionPaths'
 import { PortfolioSkeleton } from './components/PortfolioSkeleton'
+import { downloadResumeLatex, openInOverleaf } from './utils/resumeLatex'
 import { ProfileDialog } from './components/ProfileDialog'
 
 import { BACKEND_URL } from './config'
@@ -757,10 +760,15 @@ const Month = () => {
           )}
         </Stack>
       </Box>
+      {/* A visitor with nothing to show gets no section at all - otherwise a
+          published portfolio carries an empty "commit history" heading over
+          blank space. The owner always sees it, since for them it is the
+          prompt to connect. */}
+      {(canFetchContributions || contributions) && (
       <Box component="section" sx={{ mb: 6 }}>
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
           <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: '0.1em' }}>
-            Get Your Commit History HeatMap 
+            {canFetchContributions ? 'Get Your Commit History HeatMap' : 'Commit History'}
             {
               contributions && <Typography variant="overline" sx={{ color: '#ffffff', letterSpacing: '0.1em' }}> (Last 24 Weeks)</Typography>
             }
@@ -840,6 +848,7 @@ const Month = () => {
         }
           
       </Box>
+      )}
 
       {/* Custom Sections */}
       {data.customSections?.map((section) => (
@@ -1372,6 +1381,23 @@ function App() {
                 >
                   <ListItemIcon><ArticleIcon fontSize="small" /></ListItemIcon>
                   <ListItemText>{view === 'logs' ? 'Portfolio' : 'Logs'}</ListItemText>
+                </MenuItem>
+              )}
+              {isViewingOwnProfile && <Divider sx={{ my: 0.5 }} />}
+              {isViewingOwnProfile && (
+                <MenuItem
+                  onClick={() => { setMenuAnchor(null); openInOverleaf(portfolio) }}
+                >
+                  <ListItemIcon><OpenInNewIcon2 fontSize="small" /></ListItemIcon>
+                  <ListItemText>Open in Overleaf</ListItemText>
+                </MenuItem>
+              )}
+              {isViewingOwnProfile && (
+                <MenuItem
+                  onClick={() => { setMenuAnchor(null); downloadResumeLatex(portfolio) }}
+                >
+                  <ListItemIcon><DownloadIcon fontSize="small" /></ListItemIcon>
+                  <ListItemText>Download .tex</ListItemText>
                 </MenuItem>
               )}
             </Menu>
